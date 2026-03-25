@@ -40,7 +40,7 @@ pip install fabric-automation-bundles
 fab-bundle init --template medallion --name my-analytics
 
 # OSDU + Fabric for Oil, Gas & Energy
-fab-bundle init --template osdu_analytics --name chevron-osdu
+fab-bundle init --template osdu_analytics --name my-osdu-project
 ```
 
 ### Or Generate from an Existing Workspace

@@ -44,6 +44,9 @@ dev = [
     "mypy>=1.0",
     "black>=23.0",
 ]
+keyvault = [
+      "azure-keyvault-secrets>=4.7.0",
+  ]
 
 [project.scripts]
 fab-bundle = "fab_bundle.cli:cli"

@@ -31,6 +31,9 @@ Microsoft Fabric has no single declarative project definition. The Fabric CLI ca
 
 ```bash
 pip install fabric-automation-bundles
+
+# With Azure KeyVault support
+pip install fabric-automation-bundles[keyvault]
 ```
 
 ### Create a New Project

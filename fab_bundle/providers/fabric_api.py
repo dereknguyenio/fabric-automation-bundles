@@ -439,6 +439,7 @@ class FabricClient:
         shortcut_name: str,
         path: str,
         target: dict[str, Any],
+        transform: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a OneLake shortcut in a lakehouse.
 
@@ -448,12 +449,15 @@ class FabricClient:
             shortcut_name: Display name of the shortcut
             path: Target path in the lakehouse (e.g., /Tables or /Files)
             target: Shortcut target config with type-specific details
+            transform: Optional transformation config (e.g., csvToDelta)
         """
-        body = {
+        body: dict[str, Any] = {
             "name": shortcut_name,
             "path": path,
             "target": target,
         }
+        if transform:
+            body["transform"] = transform
         return self._request(
             "POST",
             f"/workspaces/{workspace_id}/items/{item_id}/shortcuts",

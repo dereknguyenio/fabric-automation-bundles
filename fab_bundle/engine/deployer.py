@@ -829,13 +829,33 @@ class Deployer:
 
                     shortcut_path = shortcut.path or "Tables"
 
+                    # Build transform config if specified
+                    transform_config = None
+                    if shortcut.transformation:
+                        t = shortcut.transformation
+                        if t.type == "file" and t.source_format == "csv":
+                            transform_config = {
+                                "type": "csvToDelta",
+                                "properties": {
+                                    "delimiter": ",",
+                                    "useFirstRowAsHeader": True,
+                                    "skipFilesWithErrors": True,
+                                },
+                                "includeSubfolders": False,
+                            }
+                        # Note: JSON, Parquet, Excel, AI transformations are portal-only as of March 2026
+
                     if self.dry_run:
                         self.console.print(f"  [dim]Would create shortcut: {name} in {lh_key}[/dim]")
+                        if transform_config:
+                            self.console.print(f"  [dim]  with transform: {transform_config['type']}[/dim]")
                     else:
                         self.client.create_shortcut(
                             workspace_id, lh_info["id"], name, shortcut_path, target_config,
+                            transform=transform_config,
                         )
-                        self.console.print(f"    Shortcut: {name} → {target_str}")
+                        xform_label = f" (transform: {transform_config['type']})" if transform_config else ""
+                        self.console.print(f"    Shortcut: {name} → {target_str}{xform_label}")
                 except Exception as e:
                     self.console.print(f"    [yellow]Warning:[/yellow] Shortcut {name} on {lh_key}: {e}")
 

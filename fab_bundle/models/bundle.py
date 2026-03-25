@@ -129,6 +129,7 @@ class NotebookResource(BaseModel):
     environment: str | None = Field(None, description="Reference to an environment resource key")
     default_lakehouse: str | None = Field(None, description="Reference to a lakehouse resource key")
     spark_properties: dict[str, str] = Field(default_factory=dict)
+    folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
 class PipelineSchedule(BaseModel):
@@ -155,12 +156,14 @@ class PipelineResource(BaseModel):
     description: str | None = None
     schedule: PipelineSchedule | None = None
     activities: list[PipelineActivity] = Field(default_factory=list)
+    folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
 class WarehouseResource(BaseModel):
     """Fabric Warehouse resource definition."""
     description: str | None = None
     sql_scripts: list[str] = Field(default_factory=list, description="Paths to SQL scripts to execute on deploy")
+    folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
 class SemanticModelResource(BaseModel):
@@ -168,6 +171,7 @@ class SemanticModelResource(BaseModel):
     path: str = Field(..., description="Path to semantic model definition directory")
     description: str | None = None
     default_lakehouse: str | None = None
+    folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
 class ReportResource(BaseModel):
@@ -175,6 +179,7 @@ class ReportResource(BaseModel):
     path: str = Field(..., description="Path to .pbir or report definition")
     description: str | None = None
     semantic_model: str | None = Field(None, description="Reference to a semantic_model resource key")
+    folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
 class DataAgentInstructions(BaseModel):

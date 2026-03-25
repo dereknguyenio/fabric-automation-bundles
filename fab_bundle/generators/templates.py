@@ -54,6 +54,36 @@ def init_from_template(
     console = console or Console()
     variables = variables or {}
 
+    # Support URL-based templates
+    if template_name.startswith("http://") or template_name.startswith("https://"):
+        import tempfile
+        import urllib.request
+        import tarfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            archive_path = Path(tmpdir) / "template.tar.gz"
+            urllib.request.urlretrieve(template_name, archive_path)
+            with tarfile.open(archive_path, "r:gz") as tar:
+                tar.extractall(tmpdir, filter="data")
+            # Find template.yml in extracted content
+            for p in Path(tmpdir).rglob("template.yml"):
+                template_dir = p.parent
+                break
+            else:
+                raise ValueError(f"No template.yml found in downloaded archive")
+            # Copy to output
+            if output_dir.exists():
+                shutil.rmtree(output_dir)
+            shutil.copytree(template_dir, output_dir, dirs_exist_ok=True)
+            if console:
+                console.print(f"[green]Created project from URL template at {output_dir}[/green]")
+            return
+
+    # Support github: shorthand
+    if template_name.startswith("github:"):
+        repo = template_name.replace("github:", "")
+        template_name = f"https://github.com/{repo}/archive/refs/heads/main.tar.gz"
+        return init_from_template(template_name, output_dir, variables, console)
+
     # Resolve template directory
     template_dir = TEMPLATES_DIR / template_name
     if not template_dir.exists():

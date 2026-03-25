@@ -236,6 +236,7 @@ class FabricClient:
         definition: dict[str, Any] | None = None,
         description: str | None = None,
         creation_payload: dict[str, Any] | None = None,
+        folder_id: str | None = None,
     ) -> dict[str, Any]:
         """Create a new item in a workspace.
 
@@ -265,6 +266,8 @@ class FabricClient:
             body["definition"] = definition
         if creation_payload:
             body["creationPayload"] = creation_payload
+        if folder_id:
+            body["folderId"] = folder_id
 
         endpoint = TYPE_ENDPOINTS.get(item_type)
         if endpoint:
@@ -319,6 +322,23 @@ class FabricClient:
         return result or {}
 
     # -----------------------------------------------------------------------
+    # Workspace folders
+    # -----------------------------------------------------------------------
+
+    def create_folder(self, workspace_id: str, display_name: str) -> dict[str, Any]:
+        """Create a folder in a workspace."""
+        return self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/folders",
+            data={"displayName": display_name},
+        ) or {}
+
+    def list_folders(self, workspace_id: str) -> list[dict[str, Any]]:
+        """List folders in a workspace."""
+        result = self._request("GET", f"/workspaces/{workspace_id}/folders")
+        return result.get("value", []) if result else []
+
+    # -----------------------------------------------------------------------
     # OneLake shortcuts
     # -----------------------------------------------------------------------
 
@@ -360,6 +380,24 @@ class FabricClient:
         self._request(
             "DELETE",
             f"/workspaces/{workspace_id}/items/{item_id}/shortcuts/{shortcut_path}/{shortcut_name}",
+        )
+
+    # -----------------------------------------------------------------------
+    # OneLake data access roles
+    # -----------------------------------------------------------------------
+
+    def update_lakehouse_data_access_roles(
+        self,
+        workspace_id: str,
+        item_id: str,
+        roles: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Update OneLake data access roles for a lakehouse."""
+        body = {"value": roles}
+        return self._request(
+            "PUT",
+            f"/workspaces/{workspace_id}/lakehouses/{item_id}/dataAccessRoles",
+            data=body,
         )
 
     # -----------------------------------------------------------------------

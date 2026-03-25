@@ -215,6 +215,25 @@ class Deployer:
                 ],
             }
 
+    def _detect_report_schema_version(self, workspace_id: str) -> dict[str, str] | None:
+        """Try to detect the correct PBIR schema versions from an existing report in the workspace."""
+        try:
+            items = self.client.list_items(workspace_id, item_type="Report")
+            for item in items:
+                try:
+                    defn = self.client.get_item_definition(workspace_id, item["id"])
+                    parts = defn.get("definition", {}).get("parts", [])
+                    for part in parts:
+                        if part.get("path") == "definition/version.json":
+                            import base64
+                            content = base64.b64decode(part["payload"]).decode("utf-8")
+                            return json.loads(content)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return None
+
     def _get_item_definition(self, resource_key: str, resource_type: str) -> dict[str, Any] | None:
         """Get the item definition for a resource based on its type."""
         builders = {
@@ -344,6 +363,21 @@ class Deployer:
                     connection_details["database"] = conn_config.database
                 connection_details.update(conn_config.properties)
 
+                # Resolve secrets in connection details
+                if conn_config.connection_string_var:
+                    import os
+                    conn_str = os.environ.get(conn_config.connection_string_var)
+                    if conn_str:
+                        connection_details["connectionString"] = conn_str
+
+                # Resolve any ${secret.*} or ${keyvault.*} references
+                try:
+                    from fab_bundle.engine.secrets import SecretsResolver
+                    resolver = SecretsResolver()
+                    connection_details = resolver.resolve_dict(connection_details)
+                except Exception:
+                    pass  # Secrets resolution is best-effort
+
                 result = self.client.create_connection(
                     display_name=name,
                     connection_type=conn_config.type.value,
@@ -385,6 +419,73 @@ class Deployer:
                     self.client.execute_sql(workspace_id, warehouse_id, sql)
                 except Exception as e:
                     self.console.print(f"  [yellow]Warning:[/yellow] SQL script '{script_path}' failed: {e}")
+
+    def _deploy_onelake_roles(self, workspace_id: str) -> None:
+        """Deploy OneLake data access roles for security config."""
+        if not self.bundle.security.roles:
+            return
+
+        # Collect roles that have onelake_roles defined
+        for role in self.bundle.security.roles:
+            if not role.onelake_roles:
+                continue
+
+            principal_value = role.entra_group or role.entra_user or role.service_principal
+            if not principal_value:
+                continue
+
+            principal_type = "Group"
+            if role.entra_user:
+                principal_type = "User"
+            elif role.service_principal:
+                principal_type = "ServicePrincipal"
+
+            principal_id = self._resolve_principal_id(principal_value, principal_type)
+
+            for binding in role.onelake_roles:
+                # Build data access role for each lakehouse referenced
+                for lh_key in self.bundle.resources.lakehouses:
+                    try:
+                        items = self.client.get_workspace_items_map(workspace_id)
+                        lh_info = items.get(lh_key)
+                        if not lh_info:
+                            continue
+
+                        # Build permission rules
+                        decision_rules = []
+                        paths = []
+                        for table in binding.tables:
+                            paths.append(f"/Tables/{table}" if table != "*" else "/Tables/*")
+                        for folder in binding.folders:
+                            paths.append(f"/Files/{folder}" if folder != "*" else "/Files/*")
+
+                        permissions = [p.value.capitalize() for p in binding.permissions]
+
+                        role_def = {
+                            "name": f"{role.name}-{lh_key}",
+                            "kind": "Policy",
+                            "decisionRules": [{
+                                "effect": "Permit",
+                                "permission": [
+                                    {"attributeName": "Path", "attributeValueIncludedIn": paths},
+                                    {"attributeName": "Action", "attributeValueIncludedIn": permissions},
+                                ],
+                            }],
+                            "members": {
+                                "fabricItemMembers": [],
+                                "microsoftEntraMembers": [{"objectId": principal_id}] if principal_id else [],
+                            },
+                        }
+
+                        if self.dry_run:
+                            self.console.print(f"  [dim]Would set OneLake role: {role.name} on {lh_key}[/dim]")
+                        else:
+                            self.client.update_lakehouse_data_access_roles(
+                                workspace_id, lh_info["id"], [role_def],
+                            )
+                            self.console.print(f"    OneLake role: {role.name} on {lh_key}")
+                    except Exception as e:
+                        self.console.print(f"    [yellow]Warning:[/yellow] OneLake role failed on {lh_key}: {e}")
 
     def _deploy_shortcuts(self, workspace_id: str) -> None:
         """Deploy OneLake shortcuts for lakehouses."""
@@ -501,6 +602,25 @@ class Deployer:
                 lh = self.bundle.resources.lakehouses.get(item.resource_key)
                 if lh and lh.enable_schemas:
                     creation_payload = {"enableSchemas": True}
+
+            # For reports: try to auto-detect schema version from existing reports
+            if item.resource_type == "Report" and definition:
+                detected_version = self._detect_report_schema_version(workspace_id)
+                if detected_version:
+                    # Inject the detected version.json into the definition parts
+                    import base64 as b64
+                    version_payload = b64.b64encode(
+                        json.dumps(detected_version).encode()
+                    ).decode()
+                    parts = definition.get("parts", [])
+                    # Replace or add version.json
+                    parts = [p for p in parts if p.get("path") != "definition/version.json"]
+                    parts.append({
+                        "path": "definition/version.json",
+                        "payload": version_payload,
+                        "payloadType": "InlineBase64",
+                    })
+                    definition["parts"] = parts
 
             result = self.client.create_item(
                 workspace_id=workspace_id,
@@ -655,6 +775,7 @@ class Deployer:
         # Deploy security, git, connections, SQL scripts (only on success)
         if result.success and not self.dry_run:
             self._deploy_security(workspace_id)
+            self._deploy_onelake_roles(workspace_id)
             self._deploy_git_integration(workspace_id)
             self._deploy_connections()
             self._deploy_shortcuts(workspace_id)

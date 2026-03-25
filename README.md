@@ -368,6 +368,20 @@ export AZURE_CLIENT_SECRET=...
 fab-bundle deploy -t prod -y
 ```
 
+## VS Code Integration
+
+Get autocomplete and validation for `fabric.yml` by adding a `.vscode/settings.json`:
+
+```json
+{
+    "yaml.schemas": {
+        "./fabric.schema.json": "fabric.yml"
+    }
+}
+```
+
+Requires the [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml).
+
 ## Architecture
 
 ```

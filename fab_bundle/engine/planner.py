@@ -153,6 +153,30 @@ class DeploymentPlan:
         console.print(f"  [bold]Summary:[/bold] {self.summary}")
         console.print()
 
+        # Cost estimation hint
+        resource_counts = {}
+        for item in self.items:
+            if item.action in (PlanAction.CREATE, PlanAction.UPDATE):
+                resource_counts[item.resource_type] = resource_counts.get(item.resource_type, 0) + 1
+        if resource_counts:
+            # Rough CU estimates per resource type (informational only)
+            cu_hints = {
+                "Lakehouse": "~0.5 CU/hr active",
+                "Warehouse": "~1 CU/hr active",
+                "Notebook": "~0.5 CU/hr running",
+                "DataPipeline": "~0.25 CU/hr running",
+                "SemanticModel": "~0.5 CU/hr loaded",
+                "Eventhouse": "~1 CU/hr active",
+            }
+            has_hints = any(rt in cu_hints for rt in resource_counts)
+            if has_hints:
+                console.print("  [dim]Estimated capacity usage (informational):[/dim]")
+                for rt, count in sorted(resource_counts.items()):
+                    hint = cu_hints.get(rt)
+                    if hint:
+                        console.print(f"    [dim]{count}x {rt}: {hint}[/dim]")
+                console.print()
+
 
 def create_plan(
     bundle: BundleDefinition,

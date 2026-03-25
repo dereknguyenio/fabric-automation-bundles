@@ -1,0 +1,5 @@
+{
+    "yaml.schemas": {
+        "./fabric.schema.json": "fabric.yml"
+    }
+}

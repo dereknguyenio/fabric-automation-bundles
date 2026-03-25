@@ -640,27 +640,46 @@ class Deployer:
             principal_id = self._resolve_principal_id(principal_value, principal_type)
 
             for binding in role.onelake_roles:
-                # Build data access role for each lakehouse referenced
+                # Build data access role for each lakehouse
+                # Must look up by type=Lakehouse (not SQLEndpoint which shares the same name)
+                all_items = self.client.list_items(workspace_id)
                 for lh_key in self.bundle.resources.lakehouses:
                     try:
-                        items = self.client.get_workspace_items_map(workspace_id)
-                        lh_info = items.get(lh_key)
-                        if not lh_info:
+                        lh_id = None
+                        for ws_item in all_items:
+                            if ws_item.get("displayName") == lh_key and ws_item.get("type") == "Lakehouse":
+                                lh_id = ws_item["id"]
+                                break
+                        if not lh_id:
                             continue
 
-                        # Build permission rules
-                        decision_rules = []
+                        # Build permission paths
                         paths = []
                         for table in binding.tables:
-                            paths.append(f"/Tables/{table}" if table != "*" else "/Tables/*")
+                            paths.append("*" if table == "*" else f"/Tables/{table}")
                         for folder in binding.folders:
-                            paths.append(f"/Files/{folder}" if folder != "*" else "/Files/*")
+                            paths.append("*" if folder == "*" else f"/Files/{folder}")
+                        if not paths:
+                            paths = ["*"]
 
                         permissions = [p.value.capitalize() for p in binding.permissions]
+                        if not permissions:
+                            permissions = ["Read"]
+
+                        # Role name: alphanumeric only (no underscores, hyphens, spaces)
+                        import re
+                        safe_name = re.sub(r'[^a-zA-Z0-9]', '', f"{role.name}{lh_key}")
+
+                        # Build members with required fields
+                        entra_members = []
+                        if principal_id:
+                            entra_members.append({
+                                "objectId": principal_id,
+                                "objectType": principal_type,
+                            })
 
                         role_def = {
-                            "name": f"{role.name}-{lh_key}",
-                            "kind": "Policy",
+                            "name": safe_name,
                             "decisionRules": [{
                                 "effect": "Permit",
                                 "permission": [
@@ -669,8 +688,11 @@ class Deployer:
                                 ],
                             }],
                             "members": {
-                                "fabricItemMembers": [],
-                                "microsoftEntraMembers": [{"objectId": principal_id}] if principal_id else [],
+                                "fabricItemMembers": [{
+                                    "itemAccess": ["ReadAll"],
+                                    "sourcePath": f"{workspace_id}/{lh_id}",
+                                }],
+                                "microsoftEntraMembers": entra_members,
                             },
                         }
 
@@ -678,9 +700,9 @@ class Deployer:
                             self.console.print(f"  [dim]Would set OneLake role: {role.name} on {lh_key}[/dim]")
                         else:
                             self.client.update_lakehouse_data_access_roles(
-                                workspace_id, lh_info["id"], [role_def],
+                                workspace_id, lh_id, [role_def],
                             )
-                            self.console.print(f"    OneLake role: {role.name} on {lh_key}")
+                            self.console.print(f"    OneLake role: {safe_name} on {lh_key}")
                     except Exception as e:
                         self.console.print(f"    [yellow]Warning:[/yellow] OneLake role failed on {lh_key}: {e}")
 

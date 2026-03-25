@@ -1,3 +1,3 @@
 """Fabric Automation Bundles — declarative project definitions for Microsoft Fabric."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"

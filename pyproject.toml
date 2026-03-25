@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fabric-automation-bundles"
-version = "0.2.0"
-description = "Declarative project definitions for Microsoft Fabric — inspired by Databricks Declarative Automation Bundles"
+version = "0.2.1"
+description = "Declarative project definitions for Microsoft Fabric"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"

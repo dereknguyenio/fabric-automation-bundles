@@ -79,32 +79,68 @@ class Deployer:
         return full_path.read_text(encoding="utf-8")
 
     def _build_notebook_definition(self, resource_key: str) -> dict[str, Any] | None:
-        """Build Fabric item definition for a notebook."""
+        """Build Fabric item definition for a notebook.
+
+        For .ipynb files: uses ipynb format directly.
+        For .py/.sql/.scala/.r files: wraps in ipynb JSON structure since
+        fabricGitSource requires special Fabric metadata annotations.
+        """
         nb = self.bundle.resources.notebooks.get(resource_key)
         if not nb:
             return None
 
-        content = self._read_file_as_base64(nb.path)
         file_ext = Path(nb.path).suffix.lower()
+        raw_content = self._read_file_text(nb.path)
 
-        # Determine the platform-specific format
-        if file_ext == ".py":
-            payload_type = "SparkNotebookDefinitionV1"
-        elif file_ext == ".ipynb":
-            payload_type = "ipynb"
+        if file_ext == ".ipynb":
+            # Already ipynb — use as-is
+            content_b64 = self._read_file_as_base64(nb.path)
+            return {
+                "format": "ipynb",
+                "parts": [
+                    {
+                        "path": "artifact.content.ipynb",
+                        "payload": content_b64,
+                        "payloadType": "InlineBase64",
+                    }
+                ],
+            }
         else:
-            payload_type = "SparkNotebookDefinitionV1"
+            # Wrap .py/.sql/.scala/.r in ipynb JSON structure
+            lang_map = {".py": "python", ".sql": "sql", ".scala": "scala", ".r": "r"}
+            language = lang_map.get(file_ext, "python")
 
-        return {
-            "format": payload_type,
-            "parts": [
-                {
-                    "path": f"notebook-content{file_ext}",
-                    "payload": content,
-                    "payloadType": "InlineBase64",
-                }
-            ],
-        }
+            ipynb = {
+                "nbformat": 4,
+                "nbformat_minor": 5,
+                "cells": [
+                    {
+                        "cell_type": "code",
+                        "source": [raw_content],
+                        "execution_count": None,
+                        "outputs": [],
+                        "metadata": {},
+                    }
+                ],
+                "metadata": {
+                    "language_info": {"name": language},
+                },
+            }
+
+            ipynb_b64 = base64.b64encode(
+                json.dumps(ipynb).encode("utf-8")
+            ).decode("utf-8")
+
+            return {
+                "format": "ipynb",
+                "parts": [
+                    {
+                        "path": "artifact.content.ipynb",
+                        "payload": ipynb_b64,
+                        "payloadType": "InlineBase64",
+                    }
+                ],
+            }
 
     def _build_pipeline_definition(self, resource_key: str) -> dict[str, Any] | None:
         """Build Fabric item definition for a pipeline."""
@@ -396,14 +432,33 @@ class Deployer:
                 self.console.print(f"  [green]+[/green] Would create {item.resource_type}: {item.resource_key}")
                 return True
 
+            # Build creation payload for type-specific options (e.g. schema-enabled lakehouses)
+            creation_payload = None
+            if item.resource_type == "Lakehouse" and resource_type_name:
+                lh = self.bundle.resources.lakehouses.get(item.resource_key)
+                if lh and lh.enable_schemas:
+                    creation_payload = {"enableSchemas": True}
+
             result = self.client.create_item(
                 workspace_id=workspace_id,
                 display_name=item.resource_key,
                 item_type=item.resource_type,
                 definition=definition,
                 description=description,
+                creation_payload=creation_payload,
             )
-            item_id = result.get("id")
+
+            # Handle LRO (202 Accepted) — poll for completion then look up item
+            if result and "operation_url" in result:
+                try:
+                    self.client._wait_for_operation(result["operation_url"])
+                    # LRO completed — look up the created item by name
+                    items_map = self.client.get_workspace_items_map(workspace_id)
+                    item_id = items_map.get(item.resource_key, {}).get("id")
+                except Exception:
+                    item_id = None
+            else:
+                item_id = result.get("id")
             if item_id:
                 self._rollback_stack.append({
                     "resource_key": item.resource_key,

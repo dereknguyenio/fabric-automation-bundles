@@ -39,20 +39,22 @@ def cli():
 
 
 @cli.command()
-@click.option("--template", "-t", default="medallion", help="Template name or path")
+@click.option("--template", "-t", default=None, help="Template name or path")
 @click.option("--output", "-o", default=".", help="Output directory")
-@click.option("--name", "-n", prompt="Project name", help="Bundle project name")
+@click.option("--name", "-n", default=None, help="Bundle project name")
 @click.option("--var", multiple=True, help="Template variables (KEY=VALUE)")
 @click.option("--interactive", "-i", is_flag=True, default=False, help="Interactive setup wizard")
-def init(template: str, output: str, name: str, var: tuple[str, ...], interactive: bool):
+def init(template: str | None, output: str, name: str | None, var: tuple[str, ...], interactive: bool):
     """Create a new bundle project from a template."""
     from fab_bundle.generators.templates import init_from_template, list_templates
 
-    variables = {"project_name": name}
+    # If no template or name provided, default to interactive mode
+    if not template and not name:
+        interactive = True
 
     if interactive:
-        from fab_bundle.generators.templates import list_templates
-        templates = list_templates()
+        from fab_bundle.generators.templates import list_templates as _list_templates
+        templates = _list_templates()
         console.print("[bold]Fabric Automation Bundles — Setup Wizard[/bold]\n")
 
         # Select template
@@ -65,14 +67,12 @@ def init(template: str, output: str, name: str, var: tuple[str, ...], interactiv
         console.print()
 
         # Project name
-        if not name or name == "my-fabric-project":
+        if not name:
             name = click.prompt("Project name", default="my-fabric-project")
 
         # Capacity
         try:
-            from fab_bundle.providers.fabric_api import FabricClient
-            client = FabricClient()
-            console.print("\nFetching available capacities...")
+            console.print("Fetching available capacities...")
             import json as _json
             import subprocess
             r = subprocess.run(
@@ -89,9 +89,17 @@ def init(template: str, output: str, name: str, var: tuple[str, ...], interactiv
                     if 1 <= cap_choice <= len(active):
                         variables["capacity_id"] = active[cap_choice - 1]["id"]
         except Exception:
-            pass
+            console.print("  [dim]Could not fetch capacities (run 'az login' first)[/dim]")
 
         console.print()
+
+    # Defaults for non-interactive mode
+    if not template:
+        template = "medallion"
+    if not name:
+        name = click.prompt("Project name")
+
+    variables = {"project_name": name}
     for v in var:
         if "=" in v:
             key, value = v.split("=", 1)

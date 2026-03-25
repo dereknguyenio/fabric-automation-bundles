@@ -482,11 +482,11 @@ class FabricClient:
         item_id: str,
         roles: list[dict[str, Any]],
     ) -> dict[str, Any] | None:
-        """Update OneLake data access roles for a lakehouse."""
+        """Update OneLake data access roles for an item (lakehouse, warehouse, etc.)."""
         body = {"value": roles}
         return self._request(
             "PUT",
-            f"/workspaces/{workspace_id}/lakehouses/{item_id}/dataAccessRoles",
+            f"/workspaces/{workspace_id}/items/{item_id}/dataAccessRoles",
             data=body,
         )
 

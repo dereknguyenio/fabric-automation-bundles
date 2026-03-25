@@ -87,6 +87,36 @@ def build_dependency_graph(resources: ResourcesConfig) -> dict[str, ResourceNode
     # Eventstreams can depend on eventhouses
     # (kept generic — no implicit deps for now)
 
+    # KQL databases depend on parent eventhouse
+    for key, kdb in resources.kql_databases.items():
+        if kdb.parent_eventhouse and kdb.parent_eventhouse in nodes:
+            nodes[key].depends_on.add(kdb.parent_eventhouse)
+
+    # KQL dashboards/querysets depend on data source
+    for key, res in resources.kql_dashboards.items():
+        if res.data_source and res.data_source in nodes:
+            nodes[key].depends_on.add(res.data_source)
+    for key, res in resources.kql_querysets.items():
+        if res.data_source and res.data_source in nodes:
+            nodes[key].depends_on.add(res.data_source)
+
+    # GraphQL APIs depend on data source
+    for key, res in resources.graphql_apis.items():
+        if res.data_source and res.data_source in nodes:
+            nodes[key].depends_on.add(res.data_source)
+
+    # Spark job definitions depend on environment and lakehouse
+    for key, sjd in resources.spark_job_definitions.items():
+        if sjd.environment and sjd.environment in nodes:
+            nodes[key].depends_on.add(sjd.environment)
+        if sjd.default_lakehouse and sjd.default_lakehouse in nodes:
+            nodes[key].depends_on.add(sjd.default_lakehouse)
+
+    # Mirrored databases depend on connection
+    for key, mdb in resources.mirrored_databases.items():
+        if mdb.connection and mdb.connection in nodes:
+            nodes[key].depends_on.add(mdb.connection)
+
     return nodes
 
 

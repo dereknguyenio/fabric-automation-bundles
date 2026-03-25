@@ -37,6 +37,22 @@ ITEM_TYPE_MAP = {
     "eventstreams": "Eventstream",
     "ml_models": "MLModel",
     "ml_experiments": "MLExperiment",
+    "kql_databases": "KQLDatabase",
+    "kql_dashboards": "KQLDashboard",
+    "kql_querysets": "KQLQueryset",
+    "dataflows": "Dataflow",
+    "graphql_apis": "GraphQLApi",
+    "spark_job_definitions": "SparkJobDefinition",
+    "sql_databases": "SQLDatabase",
+    "mirrored_databases": "MirroredDatabase",
+    "copy_jobs": "CopyJob",
+    "airflow_jobs": "ApacheAirflowJob",
+    "reflex": "Reflex",
+    "mounted_data_factories": "MountedDataFactory",
+    "user_data_functions": "UserDataFunction",
+    "variable_libraries": "VariableLibrary",
+    "ontologies": "Ontology",
+    "graphs": "Graph",
 }
 
 

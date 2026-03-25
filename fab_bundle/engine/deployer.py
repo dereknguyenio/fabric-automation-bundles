@@ -80,6 +80,21 @@ class Deployer:
             raise FileNotFoundError(f"File not found: {full_path}")
         return full_path.read_text(encoding="utf-8")
 
+    def _build_generic_definition(self, path: str, part_name: str) -> dict[str, Any] | None:
+        """Build a generic item definition from a single file."""
+        content = self._read_file_as_base64(path)
+        if not content:
+            return None
+        return {
+            "parts": [
+                {
+                    "path": part_name,
+                    "payload": content,
+                    "payloadType": "InlineBase64",
+                }
+            ],
+        }
+
     def _build_notebook_definition(self, resource_key: str) -> dict[str, Any] | None:
         """Build Fabric item definition for a notebook.
 
@@ -313,6 +328,36 @@ class Deployer:
         builder = builders.get(resource_type)
         if builder:
             return builder(resource_key)
+
+        if resource_type == "Dataflow":
+            df = self.bundle.resources.dataflows.get(resource_key)
+            if df and df.path:
+                return self._build_generic_definition(df.path, "dataflow.json")
+        elif resource_type == "SparkJobDefinition":
+            sjd = self.bundle.resources.spark_job_definitions.get(resource_key)
+            if sjd and sjd.path:
+                return self._build_notebook_definition(resource_key)
+        elif resource_type == "GraphQLApi":
+            gql = self.bundle.resources.graphql_apis.get(resource_key)
+            if gql and gql.path:
+                return self._build_generic_definition(gql.path, "schema.graphql")
+        elif resource_type == "CopyJob":
+            cj = self.bundle.resources.copy_jobs.get(resource_key)
+            if cj and cj.path:
+                return self._build_generic_definition(cj.path, "copyjob.json")
+        elif resource_type == "ApacheAirflowJob":
+            aj = self.bundle.resources.airflow_jobs.get(resource_key)
+            if aj and aj.path:
+                return self._build_generic_definition(aj.path, "dag.py")
+        elif resource_type == "Reflex":
+            rx = self.bundle.resources.reflex.get(resource_key)
+            if rx and rx.path:
+                return self._build_generic_definition(rx.path, "reflex.json")
+        elif resource_type == "UserDataFunction":
+            udf = self.bundle.resources.user_data_functions.get(resource_key)
+            if udf and udf.path:
+                return self._build_generic_definition(udf.path, "function.json")
+
         return None
 
     def _get_description(self, resource_key: str, resource_type_name: str) -> str | None:

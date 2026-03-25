@@ -244,6 +244,114 @@ class MLExperimentResource(BaseModel):
     path: str | None = None
 
 
+class KQLDatabaseResource(BaseModel):
+    """KQL Database resource definition."""
+    description: str | None = None
+    parent_eventhouse: str | None = Field(None, description="Parent eventhouse resource key")
+    kql_scripts: list[str] = Field(default_factory=list, description="Paths to KQL scripts to execute")
+
+
+class KQLDashboardResource(BaseModel):
+    """KQL Dashboard resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to dashboard definition")
+    data_source: str | None = Field(None, description="KQL database or eventhouse resource key")
+
+
+class KQLQuerysetResource(BaseModel):
+    """KQL Queryset resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to queryset definition")
+    data_source: str | None = Field(None, description="KQL database resource key")
+
+
+class DataflowResource(BaseModel):
+    """Dataflow Gen2 resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to dataflow definition JSON")
+
+
+class GraphQLApiResource(BaseModel):
+    """GraphQL API resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to GraphQL schema file")
+    data_source: str | None = Field(None, description="Lakehouse or warehouse resource key")
+
+
+class SparkJobDefinitionResource(BaseModel):
+    """Spark Job Definition resource definition."""
+    description: str | None = None
+    path: str = Field(..., description="Path to Spark job main file (.py, .jar)")
+    environment: str | None = Field(None, description="Environment resource key")
+    default_lakehouse: str | None = None
+    args: list[str] = Field(default_factory=list, description="Command-line arguments")
+    conf: dict[str, str] = Field(default_factory=dict, description="Spark configuration overrides")
+
+
+class SQLDatabaseResource(BaseModel):
+    """SQL Database resource definition."""
+    description: str | None = None
+    sql_scripts: list[str] = Field(default_factory=list, description="Paths to SQL scripts")
+
+
+class MirroredDatabaseResource(BaseModel):
+    """Mirrored Database resource definition."""
+    description: str | None = None
+    source_type: str | None = Field(None, description="Source database type (e.g., Azure SQL, Cosmos DB)")
+    connection: str | None = Field(None, description="Connection resource key")
+
+
+class CopyJobResource(BaseModel):
+    """Copy Job resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to copy job definition JSON")
+
+
+class ApacheAirflowJobResource(BaseModel):
+    """Apache Airflow Job resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to DAG definition file")
+
+
+class ReflexResource(BaseModel):
+    """Reflex (Data Activator) resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to Reflex definition")
+
+
+class MountedDataFactoryResource(BaseModel):
+    """Mounted Data Factory resource definition."""
+    description: str | None = None
+    data_factory_id: str | None = Field(None, description="Azure Data Factory resource ID")
+
+
+class UserDataFunctionResource(BaseModel):
+    """User Data Function resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to function definition")
+    runtime: str | None = Field(None, description="Function runtime (e.g., python, dotnet)")
+
+
+class VariableLibraryResource(BaseModel):
+    """Variable Library resource definition."""
+    description: str | None = None
+    variables: dict[str, str] = Field(default_factory=dict, description="Library variables")
+
+
+class OntologyResource(BaseModel):
+    """Fabric Ontology (knowledge graph) resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to ontology definition")
+    data_sources: list[str] = Field(default_factory=list, description="Lakehouse/warehouse resource keys")
+
+
+class GraphResource(BaseModel):
+    """Fabric Graph resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to graph definition")
+    data_source: str | None = Field(None, description="Lakehouse or SQL database resource key")
+
+
 # ---------------------------------------------------------------------------
 # Sub-models: Security
 # ---------------------------------------------------------------------------
@@ -359,6 +467,22 @@ class ResourcesConfig(BaseModel):
     eventstreams: dict[str, EventstreamResource] = Field(default_factory=dict)
     ml_models: dict[str, MLModelResource] = Field(default_factory=dict)
     ml_experiments: dict[str, MLExperimentResource] = Field(default_factory=dict)
+    kql_databases: dict[str, KQLDatabaseResource] = Field(default_factory=dict)
+    kql_dashboards: dict[str, KQLDashboardResource] = Field(default_factory=dict)
+    kql_querysets: dict[str, KQLQuerysetResource] = Field(default_factory=dict)
+    dataflows: dict[str, DataflowResource] = Field(default_factory=dict)
+    graphql_apis: dict[str, GraphQLApiResource] = Field(default_factory=dict)
+    spark_job_definitions: dict[str, SparkJobDefinitionResource] = Field(default_factory=dict)
+    sql_databases: dict[str, SQLDatabaseResource] = Field(default_factory=dict)
+    mirrored_databases: dict[str, MirroredDatabaseResource] = Field(default_factory=dict)
+    copy_jobs: dict[str, CopyJobResource] = Field(default_factory=dict)
+    airflow_jobs: dict[str, ApacheAirflowJobResource] = Field(default_factory=dict)
+    reflex: dict[str, ReflexResource] = Field(default_factory=dict)
+    mounted_data_factories: dict[str, MountedDataFactoryResource] = Field(default_factory=dict)
+    user_data_functions: dict[str, UserDataFunctionResource] = Field(default_factory=dict)
+    variable_libraries: dict[str, VariableLibraryResource] = Field(default_factory=dict)
+    ontologies: dict[str, OntologyResource] = Field(default_factory=dict)
+    graphs: dict[str, GraphResource] = Field(default_factory=dict)
 
     def all_resource_keys(self) -> set[str]:
         """Return all resource keys across all types."""
@@ -381,7 +505,7 @@ class ResourcesConfig(BaseModel):
         """Validate resource names follow Fabric naming rules per item type. Returns list of warnings."""
         warnings: list[str] = []
         # Lakehouses, warehouses: no hyphens, no spaces, no special chars except underscore
-        strict_name_types = {"lakehouses", "warehouses", "eventhouses"}
+        strict_name_types = {"lakehouses", "warehouses", "eventhouses", "sql_databases", "kql_databases"}
         # All types: max 256 chars, no leading/trailing spaces
         import re
         strict_pattern = re.compile(r'^[a-zA-Z0-9_]+$')

@@ -20,6 +20,8 @@ from pydantic import ValidationError
 
 from fab_bundle.models.bundle import BundleDefinition
 
+UNRESOLVED_PATTERN = re.compile(r'\$\{[^}]+\}')
+
 
 class BundleLoadError(Exception):
     """Raised when a bundle cannot be loaded."""
@@ -192,6 +194,18 @@ def load_bundle(
 
     # Second pass: substitute variables and re-validate
     substituted = _substitute_variables(data, variables)
+
+    # Check for unresolved variables
+    raw_yaml = yaml.dump(substituted, default_flow_style=False)
+    unresolved = UNRESOLVED_PATTERN.findall(raw_yaml)
+    if unresolved:
+        unique = sorted(set(unresolved))
+        import warnings
+        warnings.warn(
+            f"Unresolved variables in bundle: {', '.join(unique)}. "
+            f"These will be left as literal strings.",
+            stacklevel=2,
+        )
 
     try:
         bundle = BundleDefinition.model_validate(substituted)

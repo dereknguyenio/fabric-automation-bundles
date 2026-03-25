@@ -340,6 +340,36 @@ class ResourcesConfig(BaseModel):
                 return field_name
         return None
 
+    def validate_resource_names(self) -> list[str]:
+        """Validate resource names follow Fabric naming rules per item type. Returns list of warnings."""
+        warnings: list[str] = []
+        # Lakehouses, warehouses: no hyphens, no spaces, no special chars except underscore
+        strict_name_types = {"lakehouses", "warehouses", "eventhouses"}
+        # All types: max 256 chars, no leading/trailing spaces
+        import re
+        strict_pattern = re.compile(r'^[a-zA-Z0-9_]+$')
+        general_pattern = re.compile(r'^[a-zA-Z0-9_ -]+$')
+
+        for field_name in type(self).model_fields:
+            resource_dict = getattr(self, field_name)
+            if not isinstance(resource_dict, dict):
+                continue
+            for key in resource_dict:
+                if len(key) > 256:
+                    warnings.append(f"'{key}' exceeds 256 character limit")
+                if key != key.strip():
+                    warnings.append(f"'{key}' has leading/trailing whitespace")
+                if field_name in strict_name_types:
+                    if not strict_pattern.match(key):
+                        warnings.append(
+                            f"'{key}' ({field_name}): only letters, numbers, and underscores allowed. "
+                            f"Hyphens and spaces are not supported."
+                        )
+                else:
+                    if not general_pattern.match(key):
+                        warnings.append(f"'{key}' ({field_name}): contains invalid characters")
+        return warnings
+
 
 # ---------------------------------------------------------------------------
 # Include support
@@ -416,6 +446,11 @@ class BundleDefinition(BaseModel):
 
         if errors:
             raise ValueError("Bundle validation errors:\n  " + "\n  ".join(errors))
+
+        # Validate resource names
+        name_warnings = self.resources.validate_resource_names()
+        if name_warnings:
+            raise ValueError("Resource naming errors:\n  " + "\n  ".join(name_warnings))
 
         return self
 

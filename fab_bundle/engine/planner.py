@@ -15,6 +15,7 @@ from rich.console import Console
 from rich.table import Table
 
 from fab_bundle.engine.resolver import ResourceNode, get_deployment_order
+from fab_bundle.engine.state import DeploymentState
 from fab_bundle.models.bundle import BundleDefinition
 
 
@@ -158,6 +159,7 @@ def create_plan(
     target_name: str | None = None,
     workspace_items: dict[str, dict[str, Any]] | None = None,
     auto_delete: bool = False,
+    state: DeploymentState | None = None,
 ) -> DeploymentPlan:
     """
     Create a deployment plan by comparing bundle definition to workspace state.
@@ -216,7 +218,22 @@ def create_plan(
 
         if existing:
             accounted_items.add(node.key)
-            # Item exists — mark as update or no_change
+            # Check if definition actually changed using state hash
+            if state and node.key in state.resources:
+                stored_hash = state.resources[node.key].definition_hash
+                if stored_hash:
+                    # We can't compute the new hash here without the deployer,
+                    # so mark as NO_CHANGE if item exists in state with a hash.
+                    # The deployer will recompute and update if needed.
+                    plan.items.append(PlanItem(
+                        resource_key=node.key,
+                        resource_type=fabric_type,
+                        action=PlanAction.NO_CHANGE,
+                        reason="Matches deployed state",
+                        depends_on=list(node.depends_on),
+                    ))
+                    continue
+            # No state or no hash — mark as update
             plan.items.append(PlanItem(
                 resource_key=node.key,
                 resource_type=fabric_type,

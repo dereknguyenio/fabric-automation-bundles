@@ -161,3 +161,43 @@ RESOURCE_TYPE_PRIORITY = {
     "ml_experiments": 10,
     "ml_models": 11,
 }
+
+
+def get_deployment_waves(bundle: BundleDefinition) -> list[list[ResourceNode]]:
+    """
+    Group resources into deployment waves for parallel execution.
+
+    Each wave contains resources whose dependencies are all satisfied
+    by previous waves. Resources within a wave can be deployed in parallel.
+
+    Returns:
+        List of waves, where each wave is a list of ResourceNodes.
+    """
+    graph = build_dependency_graph(bundle.resources)
+
+    # Compute in-degree (number of dependencies) and reverse adjacency list
+    in_degree: dict[str, int] = {key: 0 for key in graph}
+    dependents: dict[str, list[str]] = {key: [] for key in graph}
+
+    for key, node in graph.items():
+        valid_deps = [d for d in node.depends_on if d in graph]
+        in_degree[key] = len(valid_deps)
+        for dep in valid_deps:
+            dependents[dep].append(key)
+
+    waves: list[list[ResourceNode]] = []
+    ready = [key for key, deg in in_degree.items() if deg == 0]
+
+    while ready:
+        wave = [graph[key] for key in sorted(ready)]
+        waves.append(wave)
+
+        next_ready: list[str] = []
+        for key in ready:
+            for dependent in dependents[key]:
+                in_degree[dependent] -= 1
+                if in_degree[dependent] == 0:
+                    next_ready.append(dependent)
+        ready = next_ready
+
+    return waves

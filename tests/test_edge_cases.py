@@ -117,13 +117,13 @@ class TestVariableSubstitution:
             },
             "resources": {
                 "lakehouses": {
-                    "data-lh": {"description": "Region: ${var.region}, Tier: ${var.tier}"},
+                    "data_lh": {"description": "Region: ${var.region}, Tier: ${var.tier}"},
                 },
             },
         }
         bundle_file = write_bundle(tmp_path, data)
         bundle = load_bundle(bundle_file)
-        assert bundle.resources.lakehouses["data-lh"].description == "Region: eastus, Tier: standard"
+        assert bundle.resources.lakehouses["data_lh"].description == "Region: eastus, Tier: standard"
 
     def test_unresolved_variable_left_as_is(self, tmp_path):
         data = {
@@ -170,13 +170,13 @@ class TestIncludes:
             "bundle": {"name": "multi-include"},
             "include": ["notebooks.yml", "pipelines.yml"],
             "resources": {
-                "lakehouses": {"main-lh": {}},
+                "lakehouses": {"main_lh": {}},
             },
         }
         bundle_file = write_bundle(tmp_path, main)
         bundle = load_bundle(bundle_file)
 
-        assert "main-lh" in bundle.resources.lakehouses
+        assert "main_lh" in bundle.resources.lakehouses
         assert "nb-from-include" in bundle.resources.notebooks
         assert "pipe-from-include" in bundle.resources.pipelines
 
@@ -186,7 +186,7 @@ class TestIncludes:
         resources_dir.mkdir()
 
         with open(resources_dir / "lakehouses.yml", "w") as f:
-            yaml.dump({"resources": {"lakehouses": {"glob-lh": {}}}}, f)
+            yaml.dump({"resources": {"lakehouses": {"glob_lh": {}}}}, f)
 
         with open(resources_dir / "notebooks.yml", "w") as f:
             yaml.dump({"resources": {"notebooks": {"glob-nb": {"path": "./nb.py"}}}}, f)
@@ -199,7 +199,7 @@ class TestIncludes:
         bundle_file = write_bundle(tmp_path, main)
         bundle = load_bundle(bundle_file)
 
-        assert "glob-lh" in bundle.resources.lakehouses
+        assert "glob_lh" in bundle.resources.lakehouses
         assert "glob-nb" in bundle.resources.notebooks
 
 
@@ -279,11 +279,11 @@ class TestPlannerEdgeCases:
     def test_plan_warns_about_unmanaged(self):
         data = {
             "bundle": {"name": "partial"},
-            "resources": {"lakehouses": {"managed-lh": {}}},
+            "resources": {"lakehouses": {"managed_lh": {}}},
         }
         bundle = BundleDefinition.model_validate(data)
         existing = {
-            "managed-lh": {"id": "1", "type": "Lakehouse"},
+            "managed_lh": {"id": "1", "type": "Lakehouse"},
             "unmanaged-nb": {"id": "2", "type": "Notebook"},
             "unmanaged-pipe": {"id": "3", "type": "DataPipeline"},
         }
@@ -368,7 +368,7 @@ class TestComplexDependencies:
         data = {
             "bundle": {"name": "wide"},
             "resources": {
-                "lakehouses": {f"lh-{i}": {} for i in range(10)},
+                "lakehouses": {f"lh_{i}": {} for i in range(10)},
             },
         }
         bundle = BundleDefinition.model_validate(data)
@@ -510,7 +510,7 @@ class TestRTIResources:
             "bundle": {"name": "rti-test"},
             "resources": {
                 "eventhouses": {
-                    "telemetry-eh": {
+                    "telemetry_eh": {
                         "description": "IoT telemetry data",
                         "kql_scripts": ["./kql/create_tables.kql"],
                         "retention_days": 365,
@@ -526,7 +526,7 @@ class TestRTIResources:
             },
         }
         bundle = BundleDefinition.model_validate(data)
-        eh = bundle.resources.eventhouses["telemetry-eh"]
+        eh = bundle.resources.eventhouses["telemetry_eh"]
         assert eh.retention_days == 365
         assert eh.cache_days == 30
         assert len(eh.kql_scripts) == 1

@@ -167,7 +167,7 @@ class Deployer:
                 ],
             }
 
-    def _build_pipeline_definition(self, resource_key: str) -> dict[str, Any] | None:
+    def _build_pipeline_definition(self, resource_key: str, workspace_id: str | None = None) -> dict[str, Any] | None:
         """Build Fabric item definition for a pipeline."""
         pipeline = self.bundle.resources.pipelines.get(resource_key)
         if not pipeline:
@@ -189,6 +189,14 @@ class Deployer:
         if not pipeline.activities:
             return None
 
+        # Resolve notebook/pipeline names to workspace item IDs
+        items_map = {}
+        if workspace_id:
+            try:
+                items_map = self.client.get_workspace_items_map(workspace_id)
+            except Exception:
+                pass
+
         # Generate pipeline JSON from YAML activities
         activities = []
         for activity in pipeline.activities:
@@ -198,23 +206,29 @@ class Deployer:
             }
 
             if activity.notebook:
+                # Resolve notebook name to item ID
+                nb_info = items_map.get(activity.notebook, {})
+                nb_id = nb_info.get("id", "")
+                if not nb_id:
+                    self.console.print(f"    [yellow]Warning:[/yellow] Notebook '{activity.notebook}' not found in workspace — pipeline may fail")
+
                 act_def["typeProperties"] = {
-                    "notebookReference": {
-                        "referenceName": activity.notebook,
-                        "type": "NotebookReference",
-                    },
+                    "notebookId": nb_id,
                 }
+                if workspace_id:
+                    act_def["typeProperties"]["workspaceId"] = workspace_id
                 if activity.parameters:
                     act_def["typeProperties"]["parameters"] = {
                         k: {"value": v, "type": "string"} for k, v in activity.parameters.items()
                     }
             elif activity.pipeline:
+                pipe_info = items_map.get(activity.pipeline, {})
+                pipe_id = pipe_info.get("id", "")
                 act_def["typeProperties"] = {
-                    "pipeline": {
-                        "referenceName": activity.pipeline,
-                        "type": "PipelineReference",
-                    },
+                    "pipelineId": pipe_id,
                 }
+                if workspace_id:
+                    act_def["typeProperties"]["workspaceId"] = workspace_id
 
             if activity.depends_on:
                 act_def["dependsOn"] = [
@@ -319,9 +333,11 @@ class Deployer:
 
     def _get_item_definition(self, resource_key: str, resource_type: str) -> dict[str, Any] | None:
         """Get the item definition for a resource based on its type."""
+        if resource_type == "DataPipeline":
+            return self._build_pipeline_definition(resource_key, workspace_id=getattr(self, '_current_workspace_id', None))
+
         builders = {
             "Notebook": self._build_notebook_definition,
-            "DataPipeline": self._build_pipeline_definition,
             "SemanticModel": self._build_semantic_model_definition,
             "Report": self._build_report_definition,
         }
@@ -991,6 +1007,7 @@ class Deployer:
         # Ensure workspace exists
         try:
             workspace_id = self._ensure_workspace(target_name)
+            self._current_workspace_id = workspace_id
         except Exception as e:
             result.success = False
             result.errors.append(f"Failed to ensure workspace: {e}")

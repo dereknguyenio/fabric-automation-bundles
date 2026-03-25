@@ -1,5 +1,7 @@
 # Fabric Automation Bundles
 
+> **v1.0.0-beta** — 30 item types verified against live Fabric API. Production-ready for core workflows. [See what's tested.](#tested-item-types)
+
 **Declarative project definitions for Microsoft Fabric.**
 
 Define your entire Fabric project in a single `fabric.yml` — lakehouses, notebooks, pipelines, semantic models, Data Agents, security roles, and environment targets — then validate, plan, and deploy with a single command.
@@ -418,6 +420,38 @@ cd fabric-automation-bundles
 pip install -e ".[dev]"
 pytest
 ```
+
+## Tested Item Types
+
+30 item types verified against a live Fabric workspace:
+
+| Status | Item Types |
+|--------|-----------|
+| **Verified** (30) | Lakehouse, Notebook, DataPipeline, Warehouse, Environment, DataAgent, Eventhouse, KQLDatabase, KQLDashboard, KQLQueryset, Eventstream, Reflex, MLModel, MLExperiment, SparkJobDefinition, GraphQLApi, CopyJob, ApacheAirflowJob, Ontology, VariableLibrary, SQLDatabase, CosmosDBDatabase, MirroredAzureDatabricksCatalog, OperationsAgent, AnomalyDetector, DigitalTwinBuilder, GraphQuerySet, GraphModel, Map, UserDataFunction |
+| **Capacity-gated** (4) | DataBuildToolJob, Graph, HLSCohort, EventSchemaSet |
+| **Needs config** (2) | SnowflakeDatabase, DigitalTwinBuilderFlow |
+| **List-only** (5) | Datamart, Dashboard, MirroredWarehouse, PaginatedReport, Dataflow |
+| **Needs definition files** (4) | SemanticModel (TMDL), Report (PBIR), MirroredDatabase, MountedDataFactory |
+
+## Feature Stability
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| validate, plan, deploy, destroy | **Stable** | Tested end-to-end against live API |
+| drift, status, diff, history, doctor | **Stable** | Tested against live workspaces |
+| run (notebooks/pipelines) | **Stable** | Job submission works, LRO tracking limited |
+| Security roles (workspace) | **Stable** | Entra user/group GUIDs |
+| Incremental deploy (hash-based) | **Stable** | Skips unchanged resources |
+| Deployment locking | **Stable** | Local + remote (blob lease) |
+| CI/CD (GitHub Actions) | **Stable** | [Proven end-to-end](https://github.com/dereknguyenio/fabric-fab-cicd-example) |
+| Remote state (OneLake, Blob, ADLS) | **Beta** | Built, not yet tested live |
+| MCP server | **Beta** | 12 tools verified locally |
+| OneLake data access roles | **Beta** | Built, not yet tested live |
+| Environment publish (libraries) | **Beta** | Fire-and-forget, can't track completion |
+| watch, promote, canary | **Experimental** | Built, untested |
+| Notifications (Slack/Teams) | **Experimental** | Built, untested |
+| Policy enforcement | **Experimental** | Built, untested |
+| Shortcut transformations | **Experimental** | Model defined, API untested |
 
 ## License
 

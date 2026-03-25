@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -203,8 +204,8 @@ class Deployer:
                 ],
             }
         else:
-            # .py files — wrap as SparkJobDefinition
-            content_b64 = self._read_file_as_base64(sjd.path)
+            # .py files — single part with SparkJobDefinitionV1.json only
+            # The executable file is referenced by URI after upload, not embedded
             return {
                 "parts": [
                     {
@@ -220,11 +221,6 @@ class Deployer:
                             "language": "Python",
                             "environmentArtifactId": None,
                         }).encode()).decode(),
-                        "payloadType": "InlineBase64",
-                    },
-                    {
-                        "path": Path(sjd.path).name,
-                        "payload": content_b64,
                         "payloadType": "InlineBase64",
                     },
                 ],
@@ -963,14 +959,26 @@ class Deployer:
                 if lh and lh.enable_schemas:
                     creation_payload = {"enableSchemas": True}
 
-            # KQL databases require parent eventhouse ID
+            # KQL databases require parent eventhouse ID — may need retry if eventhouse still provisioning
             if item.resource_type == "KQLDatabase" and resource_type_name:
                 kdb = self.bundle.resources.kql_databases.get(item.resource_key)
                 if kdb and kdb.parent_eventhouse:
-                    items_map = self.client.get_workspace_items_map(workspace_id)
-                    parent_info = items_map.get(kdb.parent_eventhouse, {})
-                    if parent_info.get("id"):
-                        creation_payload = {"parentEventhouseItemId": parent_info["id"]}
+                    # Look up parent eventhouse by name AND type
+                    # Fabric auto-creates a KQLDatabase with same name as the Eventhouse,
+                    # so we must filter by type to get the actual Eventhouse item
+                    parent_id = None
+                    for _wait in range(12):
+                        all_items = self.client.list_items(workspace_id)
+                        for ws_item in all_items:
+                            if ws_item.get("displayName") == kdb.parent_eventhouse and ws_item.get("type") == "Eventhouse":
+                                parent_id = ws_item["id"]
+                                break
+                        if parent_id:
+                            break
+                        self.console.print(f"  [dim]Waiting for eventhouse '{kdb.parent_eventhouse}' to provision...[/dim]")
+                        time.sleep(5)
+                    if parent_id:
+                        creation_payload = {"parentEventhouseItemId": parent_id}
                     else:
                         self.console.print(f"  [yellow]Warning:[/yellow] Parent eventhouse '{kdb.parent_eventhouse}' not found for KQL database '{item.resource_key}'")
                         return False

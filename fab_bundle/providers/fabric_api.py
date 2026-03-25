@@ -533,14 +533,12 @@ class FabricClient:
         params = {"beta": "False"}
         resp = self._session.post(url, headers=self._headers, params=params, timeout=60)
 
-        if resp.status_code == 202:
-            # LRO — poll for completion
-            operation_url = resp.headers.get("Location", "")
-            if operation_url:
-                return self._wait_for_operation(operation_url, timeout=600)
-            return {"status": "accepted"}
-        elif resp.status_code == 200:
-            return resp.json() if resp.text else {"status": "success"}
+        # Fire-and-forget — environment publish can take 5-10 min, don't block
+        if resp.status_code in (200, 202):
+            return {"status": "publish_triggered"}
+        elif resp.status_code >= 400:
+            error_msg = resp.text[:300] if resp.text else f"HTTP {resp.status_code}"
+            raise Exception(f"Environment publish failed: {error_msg}")
         return None
 
     def update_environment_libraries(

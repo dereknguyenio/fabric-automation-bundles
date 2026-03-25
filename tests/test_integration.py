@@ -453,6 +453,10 @@ class TestAllItemTypes:
             client.get_workspace_items_map.return_value = {
                 "test_eh": {"id": "eh-001", "type": "Eventhouse"},
             }
+            # list_items must also return the Eventhouse for KQL DB parent lookup
+            client.list_items.return_value = [
+                {"id": "eh-001", "displayName": "test_eh", "type": "Eventhouse"},
+            ]
 
             plan = create_plan(bundle, "dev", workspace_items={})
             assert not plan.errors

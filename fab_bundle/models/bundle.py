@@ -250,7 +250,7 @@ class EventstreamResource(BaseModel):
 
 class MLModelResource(BaseModel):
     """ML Model resource definition."""
-    path: str = Field(..., description="Path to model definition or MLflow model URI")
+    path: str | None = Field(None, description="Path to model definition or MLflow model URI")
     description: str | None = None
     framework: str | None = None
 
@@ -298,7 +298,7 @@ class GraphQLApiResource(BaseModel):
 class SparkJobDefinitionResource(BaseModel):
     """Spark Job Definition resource definition."""
     description: str | None = None
-    path: str = Field(..., description="Path to Spark job main file (.py, .jar)")
+    path: str | None = Field(None, description="Path to Spark job main file (.py, .jar)")
     environment: str | None = Field(None, description="Environment resource key")
     default_lakehouse: str | None = None
     args: list[str] = Field(default_factory=list, description="Command-line arguments")

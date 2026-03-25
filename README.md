@@ -213,7 +213,87 @@ include:
   - security.yml
 ```
 
-## CI/CD Integration
+## Developer Workflow & CI/CD Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Developer Workflow                             │
+│                                                                         │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────────┐  │
+│  │  Author   │    │ Validate │    │   Plan   │    │  Deploy to Dev   │  │
+│  │fabric.yml │───▶│  locally │───▶│  (diff)  │───▶│   (iterate)     │  │
+│  │+ code     │    │          │    │          │    │                  │  │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────────────┘  │
+│       │                                                    │           │
+│       ▼                                                    ▼           │
+│   git commit                                       fab-bundle drift   │
+│       │                                           (detect changes)     │
+│       ▼                                                                │
+│   git push / PR                                                        │
+└───────┬─────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        CI/CD Pipeline                                   │
+│                                                                         │
+│  ┌──────────────────┐                                                   │
+│  │  PR Opened        │                                                  │
+│  │  ┌──────────────┐ │                                                  │
+│  │  │ validate     │ │  ← Catch schema errors, broken refs before merge │
+│  │  │ plan -t dev  │ │  ← Preview what would change (no side effects)   │
+│  │  └──────────────┘ │                                                  │
+│  └────────┬─────────┘                                                  │
+│           │ merge to main                                               │
+│           ▼                                                             │
+│  ┌──────────────────┐                                                   │
+│  │  Deploy Staging   │                                                  │
+│  │  ┌──────────────┐ │                                                  │
+│  │  │ plan -t stg  │ │  ← Show diff in CI logs                         │
+│  │  │ deploy -t stg│ │  ← Auto-deploy, service principal auth          │
+│  │  └──────────────┘ │                                                  │
+│  └────────┬─────────┘                                                  │
+│           │ approval gate                                               │
+│           ▼                                                             │
+│  ┌──────────────────┐                                                   │
+│  │  Deploy Prod      │                                                  │
+│  │  ┌──────────────┐ │                                                  │
+│  │  │ plan -t prod │ │  ← Final diff review                            │
+│  │  │ deploy -t prod│ │  ← Requires manual approval in GitHub/ADO      │
+│  │  └──────────────┘ │                                                  │
+│  └──────────────────┘                                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Microsoft Fabric                                    │
+│                                                                         │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                  │
+│  │  Dev         │   │  Staging     │   │  Production  │                 │
+│  │  Workspace   │   │  Workspace   │   │  Workspace   │                 │
+│  │             │   │             │   │             │                    │
+│  │ Lakehouses  │   │ Lakehouses  │   │ Lakehouses  │                   │
+│  │ Notebooks   │   │ Notebooks   │   │ Notebooks   │                   │
+│  │ Pipelines   │   │ Pipelines   │   │ Pipelines   │                   │
+│  │ Warehouses  │   │ Warehouses  │   │ Warehouses  │                   │
+│  │ Models      │   │ Models      │   │ Models      │                   │
+│  │ Reports     │   │ Reports     │   │ Reports     │                   │
+│  │ Agents      │   │ Agents      │   │ Agents      │                   │
+│  └─────────────┘   └─────────────┘   └─────────────┘                  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### How `fab-bundle` fits in the pipeline
+
+| Stage | Command | What happens |
+|-------|---------|--------------|
+| Local dev | `fab-bundle validate` | Schema validation, reference checks, dependency resolution |
+| Local dev | `fab-bundle plan -t dev` | Connects to Fabric, diffs desired vs actual state |
+| Local dev | `fab-bundle deploy -t dev` | Creates/updates resources in dev workspace |
+| Local dev | `fab-bundle drift` | Detects out-of-band changes made in the portal |
+| PR check | `fab-bundle validate` | Gate: blocks merge if bundle is invalid |
+| PR check | `fab-bundle plan -t staging` | Informational: shows what the merge will change |
+| CI deploy | `fab-bundle deploy -t staging -y` | Auto-deploys on merge, service principal auth |
+| CI deploy | `fab-bundle deploy -t prod -y` | Deploys after manual approval gate |
 
 ### GitHub Actions
 

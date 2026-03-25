@@ -727,6 +727,12 @@ class PolicyConfig(BaseModel):
     blocked_libraries: list[str] = Field(default_factory=list)
 
 
+class StateConfig(BaseModel):
+    """Remote state backend configuration."""
+    backend: str = Field("local", description="State backend: local, azureblob, adls")
+    config: dict[str, str] = Field(default_factory=dict, description="Backend-specific configuration")
+
+
 class BundleDefinition(BaseModel):
     """
     Root model for a fabric.yml bundle definition.
@@ -745,6 +751,7 @@ class BundleDefinition(BaseModel):
     connections: dict[str, ConnectionConfig] = Field(default_factory=dict)
     policies: PolicyConfig = Field(default_factory=PolicyConfig)
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
+    state: StateConfig = Field(default_factory=StateConfig, description="Remote state backend")
     targets: dict[str, TargetConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")

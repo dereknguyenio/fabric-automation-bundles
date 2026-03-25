@@ -250,10 +250,15 @@ def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_appr
     bundle_path = Path(bundle_file) if bundle_file else Path.cwd()
     project_dir = bundle_path.parent if bundle_path.is_file() else bundle_path
 
-    # Set up state manager
+    # Set up state manager (with remote backend if configured)
     from fab_bundle.engine.state import StateManager
     target_label = target or "default"
-    state_mgr = StateManager(project_dir, target_label)
+    state_backend = getattr(bundle, 'state', None)
+    state_mgr = StateManager(
+        project_dir, target_label,
+        backend_type=state_backend.backend if state_backend else "local",
+        backend_config=dict(state_backend.config) if state_backend and state_backend.config else None,
+    )
 
     # Connect to Fabric
     try:

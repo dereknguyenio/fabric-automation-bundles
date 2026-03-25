@@ -78,32 +78,56 @@ class DeploymentState:
 
 
 class StateManager:
-    """Manages deployment state persistence and drift detection."""
+    """Manages deployment state persistence and drift detection.
 
-    def __init__(self, project_dir: Path, target_name: str = "default"):
+    Supports pluggable backends:
+    - local: file-based in .fab-bundle/ (default)
+    - azureblob: Azure Blob Storage (for team/CI state sharing)
+    - adls: Azure Data Lake Storage Gen2
+
+    Configure in fabric.yml:
+        state:
+          backend: azureblob
+          config:
+            account_name: mystorageaccount
+            container_name: fab-bundle-state
+    """
+
+    def __init__(self, project_dir: Path, target_name: str = "default", backend_type: str = "local", backend_config: dict[str, str] | None = None):
         self.project_dir = project_dir
         self.target_name = target_name
         self._state_dir = project_dir / ".fab-bundle"
         self._state_file = self._state_dir / f"state-{target_name}.json"
 
+        # Initialize backend
+        from fab_bundle.engine.state_backend import create_backend
+        self._backend = create_backend(backend_type, backend_config, project_dir)
+        self._state_key = f"state-{target_name}"
+        self._lock_key = f"lock-{target_name}"
+
     def load(self) -> DeploymentState:
-        """Load state from disk. Returns empty state if none exists."""
-        if not self._state_file.exists():
-            return DeploymentState(target_name=self.target_name)
-        try:
-            data = json.loads(self._state_file.read_text(encoding="utf-8"))
+        """Load state from backend. Returns empty state if none exists."""
+        data = self._backend.read(self._state_key)
+        if data:
             return DeploymentState.from_dict(data)
-        except (json.JSONDecodeError, KeyError):
-            return DeploymentState(target_name=self.target_name)
+        # Fallback: try local file (migration from old format)
+        if self._state_file.exists():
+            try:
+                data = json.loads(self._state_file.read_text(encoding="utf-8"))
+                return DeploymentState.from_dict(data)
+            except (json.JSONDecodeError, KeyError):
+                pass
+        return DeploymentState(target_name=self.target_name)
 
     def save(self, state: DeploymentState) -> None:
-        """Persist state to disk."""
+        """Persist state to backend."""
+        self._backend.write(self._state_key, state.to_dict())
+        # Also write locally for backwards compatibility
         self._state_dir.mkdir(parents=True, exist_ok=True)
         self._state_file.write_text(
             json.dumps(state.to_dict(), indent=2, default=str),
             encoding="utf-8",
         )
-        # Write .gitignore for state dir if it doesn't exist
         gitignore = self._state_dir / ".gitignore"
         if not gitignore.exists():
             gitignore.write_text("# Deployment state — machine-specific, do not commit\n*\n")
@@ -146,47 +170,22 @@ class StateManager:
         self.save(state)
 
     def acquire_lock(self, deployer_id: str = "", timeout_minutes: int = 30) -> bool:
-        """Acquire a deployment lock. Returns True if lock acquired."""
+        """Acquire a deployment lock. Uses backend for distributed locking."""
         import socket
         import os
-        lock_file = self._state_dir / f"lock-{self.target_name}.json"
-        self._state_dir.mkdir(parents=True, exist_ok=True)
-
-        if lock_file.exists():
-            try:
-                lock_data = json.loads(lock_file.read_text())
-                lock_time = lock_data.get("timestamp", 0)
-                # Check if lock is stale
-                if time.time() - lock_time > timeout_minutes * 60:
-                    pass  # Stale, override
-                else:
-                    return False  # Lock held
-            except (json.JSONDecodeError, KeyError):
-                pass
-
-        lock_data = {
-            "timestamp": time.time(),
-            "deployer": deployer_id or f"{os.environ.get('USER', 'unknown')}@{socket.gethostname()}",
-            "ci_run_id": os.environ.get("GITHUB_RUN_ID", os.environ.get("BUILD_BUILDID", "")),
-        }
-        lock_file.write_text(json.dumps(lock_data, indent=2))
-        return True
+        owner = deployer_id or f"{os.environ.get('USER', 'unknown')}@{socket.gethostname()}"
+        ci_run = os.environ.get("GITHUB_RUN_ID", os.environ.get("BUILD_BUILDID", ""))
+        if ci_run:
+            owner = f"{owner} (CI: {ci_run})"
+        return self._backend.acquire_lock(self._lock_key, owner, timeout_minutes * 60)
 
     def release_lock(self) -> None:
         """Release the deployment lock."""
-        lock_file = self._state_dir / f"lock-{self.target_name}.json"
-        if lock_file.exists():
-            lock_file.unlink()
+        self._backend.release_lock(self._lock_key)
 
     def get_lock_info(self) -> dict[str, Any] | None:
         """Get info about the current lock, or None if unlocked."""
-        lock_file = self._state_dir / f"lock-{self.target_name}.json"
-        if not lock_file.exists():
-            return None
-        try:
-            return json.loads(lock_file.read_text())
-        except (json.JSONDecodeError, KeyError):
-            return None
+        return self._backend.get_lock_info(self._lock_key)
 
     def detect_drift(
         self,

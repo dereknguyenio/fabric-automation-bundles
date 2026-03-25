@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fabric-automation-bundles"
-version = "0.7.1"
+version = "0.8.0"
 description = "Declarative project definitions for Microsoft Fabric"
 readme = "README.md"
 license = {text = "MIT"}
@@ -39,6 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 keyvault = ["azure-keyvault-secrets"]
 mcp = ["mcp>=1.0.0"]
+remote-state = ["azure-storage-blob>=12.0.0", "azure-storage-file-datalake>=12.0.0"]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",

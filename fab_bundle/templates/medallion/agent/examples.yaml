@@ -1,0 +1,42 @@
+# Few-shot examples for Data Agent grounding
+
+examples:
+  - question: "What was the total value yesterday?"
+    sql: |
+      SELECT date, total_value, record_count
+      FROM gold_daily_summary
+      WHERE date = DATEADD(day, -1, CAST(GETDATE() AS DATE))
+    explanation: "Retrieves daily summary for yesterday's date"
+
+  - question: "Show me the trend over the last 7 days"
+    sql: |
+      SELECT date, total_value, avg_value, record_count
+      FROM gold_daily_summary
+      WHERE date >= DATEADD(day, -7, CAST(GETDATE() AS DATE))
+      ORDER BY date ASC
+    explanation: "Returns daily metrics for the past week sorted chronologically"
+
+  - question: "Which record has the highest value?"
+    sql: |
+      SELECT TOP 1 id, name, value, ingested_at
+      FROM gold_latest_snapshot
+      ORDER BY value DESC
+    explanation: "Finds the single record with the maximum current value"
+
+  - question: "How many records do we have?"
+    sql: |
+      SELECT COUNT(*) AS total_records,
+             SUM(value) AS total_value,
+             AVG(value) AS avg_value
+      FROM gold_latest_snapshot
+    explanation: "Aggregate statistics across all current records"
+
+  - question: "What's the daily average over the last month?"
+    sql: |
+      SELECT AVG(total_value) AS avg_daily_value,
+             AVG(record_count) AS avg_daily_records,
+             MIN(date) AS period_start,
+             MAX(date) AS period_end
+      FROM gold_daily_summary
+      WHERE date >= DATEADD(day, -30, CAST(GETDATE() AS DATE))
+    explanation: "Computes average daily metrics over a 30-day window"

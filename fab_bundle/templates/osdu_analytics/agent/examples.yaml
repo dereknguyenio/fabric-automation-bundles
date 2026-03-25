@@ -1,0 +1,77 @@
+# Few-shot examples for OSDU Data Agent
+
+examples:
+  - question: "What are our top 10 producing wells this month?"
+    sql: |
+      SELECT TOP 10 
+          w.facility_name, w.field_name, w.basin,
+          SUM(p.oil_bbl) AS total_oil, SUM(p.gas_mcf) AS total_gas, SUM(p.boe) AS total_boe
+      FROM production_daily p
+      INNER JOIN wells w ON p.well_id = w.well_id
+      WHERE p.production_date >= DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
+      GROUP BY w.facility_name, w.field_name, w.basin
+      ORDER BY total_boe DESC
+
+  - question: "How many active wells do we have in each basin?"
+    sql: |
+      SELECT basin, COUNT(*) AS well_count
+      FROM wells
+      WHERE well_status = 'Active'
+      GROUP BY basin
+      ORDER BY well_count DESC
+
+  - question: "What's the production trend for well Belmont 14-2H?"
+    sql: |
+      SELECT p.production_date, p.oil_bbl, p.gas_mcf, p.water_bbl, p.boe, p.gor, p.water_cut
+      FROM production_daily p
+      INNER JOIN wells w ON p.well_id = w.well_id
+      WHERE w.facility_name LIKE '%Belmont 14-2H%'
+      ORDER BY p.production_date DESC
+
+  - question: "Which wells have increasing water cut over the last 3 months?"
+    sql: |
+      WITH monthly_wc AS (
+          SELECT p.well_id, 
+                 DATE_TRUNC('month', p.production_date) AS month,
+                 AVG(p.water_cut) AS avg_water_cut
+          FROM production_daily p
+          WHERE p.production_date >= DATEADD(month, -3, GETDATE())
+          GROUP BY p.well_id, DATE_TRUNC('month', p.production_date)
+      ),
+      wc_trend AS (
+          SELECT well_id,
+                 MAX(CASE WHEN month = DATE_TRUNC('month', DATEADD(month, -2, GETDATE())) THEN avg_water_cut END) AS wc_3mo_ago,
+                 MAX(CASE WHEN month = DATE_TRUNC('month', GETDATE()) THEN avg_water_cut END) AS wc_current
+          FROM monthly_wc GROUP BY well_id
+      )
+      SELECT w.facility_name, w.field_name,
+             t.wc_3mo_ago, t.wc_current,
+             t.wc_current - t.wc_3mo_ago AS wc_increase
+      FROM wc_trend t
+      INNER JOIN wells w ON t.well_id = w.well_id
+      WHERE t.wc_current > t.wc_3mo_ago
+      ORDER BY wc_increase DESC
+
+  - question: "What's total field production by month for the Permian?"
+    sql: |
+      SELECT pm.production_month,
+             COUNT(DISTINCT pm.well_id) AS producing_wells,
+             SUM(pm.oil_bbl) AS total_oil,
+             SUM(pm.gas_mcf) AS total_gas,
+             SUM(pm.boe) AS total_boe
+      FROM production_monthly pm
+      INNER JOIN wells w ON pm.well_id = w.well_id
+      WHERE w.basin LIKE '%Permian%'
+      GROUP BY pm.production_month
+      ORDER BY pm.production_month DESC
+
+  - question: "Show me all horizontal wells completed in the last year"
+    sql: |
+      SELECT w.facility_name, wb.wellbore_name, wb.trajectory_type,
+             wb.target_formation, wb.total_depth_md_ft, wb.completion_date,
+             w.field_name, w.basin
+      FROM wellbores wb
+      INNER JOIN wells w ON wb.well_id = w.well_id
+      WHERE wb.trajectory_type = 'Horizontal'
+        AND wb.completion_date >= DATEADD(year, -1, GETDATE())
+      ORDER BY wb.completion_date DESC

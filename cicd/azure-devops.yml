@@ -1,0 +1,143 @@
+# Fabric Automation Bundles — Azure DevOps YAML Pipeline
+#
+# This pipeline validates on every PR and deploys on merge to main.
+#
+# Required variable groups:
+#   fabric-credentials:
+#     AZURE_TENANT_ID
+#     AZURE_CLIENT_ID
+#     AZURE_CLIENT_SECRET
+#
+# Optional:
+#   Configure Azure DevOps Environments for 'staging' and 'production'
+#   with manual approval gates.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - fabric.yml
+      - resources/**
+      - notebooks/**
+      - pipelines/**
+      - sql/**
+      - semantic_model/**
+      - reports/**
+      - agent/**
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  - group: fabric-credentials
+  - name: pythonVersion
+    value: '3.12'
+
+stages:
+  # ---------------------------------------------------------------------------
+  # Validate
+  # ---------------------------------------------------------------------------
+  - stage: Validate
+    displayName: 'Validate Bundle'
+    jobs:
+      - job: ValidateBundle
+        displayName: 'Validate & Plan'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(pythonVersion)
+
+          - script: pip install fabric-automation-bundles
+            displayName: 'Install fabric-automation-bundles'
+
+          - script: fab-bundle validate
+            displayName: 'Validate fabric.yml'
+
+          - script: fab-bundle plan -t dev
+            displayName: 'Plan dev deployment (dry-run)'
+            env:
+              AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+              AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+              AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+
+  # ---------------------------------------------------------------------------
+  # Deploy to Staging
+  # ---------------------------------------------------------------------------
+  - stage: DeployStaging
+    displayName: 'Deploy to Staging'
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployToStaging
+        displayName: 'Deploy to Staging'
+        environment: staging
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: $(pythonVersion)
+
+                - script: pip install fabric-automation-bundles
+                  displayName: 'Install fabric-automation-bundles'
+
+                - script: fab-bundle plan -t staging
+                  displayName: 'Plan staging deployment'
+                  env:
+                    AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+                    AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+                    AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+
+                - script: fab-bundle deploy -t staging -y
+                  displayName: 'Deploy to staging'
+                  env:
+                    AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+                    AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+                    AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+
+  # ---------------------------------------------------------------------------
+  # Deploy to Production (with approval gate)
+  # ---------------------------------------------------------------------------
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    dependsOn: DeployStaging
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployToProduction
+        displayName: 'Deploy to Production'
+        environment: production  # Configure approval gates in ADO
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: $(pythonVersion)
+
+                - script: pip install fabric-automation-bundles
+                  displayName: 'Install fabric-automation-bundles'
+
+                - script: fab-bundle plan -t prod
+                  displayName: 'Plan production deployment'
+                  env:
+                    AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+                    AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+                    AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+
+                - script: fab-bundle deploy -t prod -y
+                  displayName: 'Deploy to production'
+                  env:
+                    AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+                    AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+                    AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)

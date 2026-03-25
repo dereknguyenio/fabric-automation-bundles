@@ -1,0 +1,286 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/microsoft/fabric-automation-bundles/fabric.schema.json",
+  "title": "Fabric Automation Bundle",
+  "description": "Declarative project definition for Microsoft Fabric.",
+  "type": "object",
+  "required": ["bundle"],
+  "properties": {
+    "bundle": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "description": "Bundle name (identifier)" },
+        "version": { "type": "string", "default": "0.1.0" },
+        "description": { "type": "string" }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "workspace_id": { "type": "string" },
+        "capacity": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "include": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Additional YAML files to merge into the bundle"
+    },
+    "variables": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "default": { "type": "string" }
+            }
+          }
+        ]
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "lakehouses": { "$ref": "#/definitions/resourceMap_lakehouse" },
+        "notebooks": { "$ref": "#/definitions/resourceMap_notebook" },
+        "pipelines": { "$ref": "#/definitions/resourceMap_pipeline" },
+        "warehouses": { "$ref": "#/definitions/resourceMap_warehouse" },
+        "semantic_models": { "$ref": "#/definitions/resourceMap_semantic_model" },
+        "reports": { "$ref": "#/definitions/resourceMap_report" },
+        "data_agents": { "$ref": "#/definitions/resourceMap_data_agent" },
+        "environments": { "$ref": "#/definitions/resourceMap_environment" },
+        "eventhouses": { "$ref": "#/definitions/resourceMap_eventhouse" },
+        "eventstreams": { "$ref": "#/definitions/resourceMap_eventstream" }
+      }
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/securityRole" }
+        }
+      }
+    },
+    "connections": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/connection" }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/target" }
+    }
+  },
+  "definitions": {
+    "resourceMap_lakehouse": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "enable_schemas": { "type": "boolean", "default": true },
+          "shortcuts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "target"],
+              "properties": {
+                "name": { "type": "string" },
+                "target": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resourceMap_notebook": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string" },
+          "description": { "type": "string" },
+          "environment": { "type": "string" },
+          "default_lakehouse": { "type": "string" }
+        }
+      }
+    },
+    "resourceMap_pipeline": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "description": { "type": "string" },
+          "schedule": {
+            "type": "object",
+            "properties": {
+              "frequency": { "type": "string", "enum": ["once", "hourly", "daily", "weekly", "monthly", "cron"] },
+              "cron": { "type": "string" },
+              "timezone": { "type": "string" }
+            }
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "notebook": { "type": "string" },
+                "pipeline": { "type": "string" },
+                "depends_on": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resourceMap_warehouse": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "sql_scripts": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "resourceMap_semantic_model": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string" },
+          "description": { "type": "string" },
+          "default_lakehouse": { "type": "string" }
+        }
+      }
+    },
+    "resourceMap_report": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string" },
+          "description": { "type": "string" },
+          "semantic_model": { "type": "string" }
+        }
+      }
+    },
+    "resourceMap_data_agent": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "sources": { "type": "array", "items": { "type": "string" } },
+          "instructions": { "type": "string" },
+          "few_shot_examples": { "type": "string" },
+          "tables_in_scope": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "resourceMap_environment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "runtime": { "type": "string" },
+          "description": { "type": "string" },
+          "libraries": { "type": "array", "items": { "type": "string" } },
+          "spark_properties": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      }
+    },
+    "resourceMap_eventhouse": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "kql_scripts": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "resourceMap_eventstream": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "path": { "type": "string" }
+        }
+      }
+    },
+    "securityRole": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "entra_group": { "type": "string" },
+        "entra_user": { "type": "string" },
+        "service_principal": { "type": "string" },
+        "workspace_role": { "type": "string", "enum": ["admin", "member", "contributor", "viewer"] },
+        "onelake_roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tables": { "type": "array", "items": { "type": "string" } },
+              "folders": { "type": "array", "items": { "type": "string" } },
+              "permissions": { "type": "array", "items": { "type": "string", "enum": ["read", "write", "readwrite"] } }
+            }
+          }
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["adls_gen2", "sql_server", "azure_sql", "cosmos_db", "kusto", "http", "custom"] },
+        "endpoint": { "type": "string" },
+        "database": { "type": "string" },
+        "auth_method": { "type": "string" },
+        "properties": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "default": { "type": "boolean" },
+        "workspace": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "workspace_id": { "type": "string" },
+            "capacity": { "type": "string" }
+          }
+        },
+        "variables": { "type": "object", "additionalProperties": { "type": "string" } },
+        "run_as": {
+          "type": "object",
+          "properties": {
+            "service_principal": { "type": "string" },
+            "user_name": { "type": "string" }
+          }
+        },
+        "security": {
+          "type": "object",
+          "properties": {
+            "roles": { "type": "array", "items": { "$ref": "#/definitions/securityRole" } }
+          }
+        }
+      }
+    }
+  }
+}

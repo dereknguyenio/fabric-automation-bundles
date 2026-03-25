@@ -1,0 +1,214 @@
+bundle:
+  name: ${{project_name}}
+  version: "0.1.0"
+  description: "OSDU + Fabric analytics platform for upstream O&G — wells, wellbores, and production data"
+
+workspace:
+  capacity: ${{capacity_sku}}
+
+variables:
+  adme_endpoint:
+    description: "Azure Data Manager for Energy (ADME) endpoint"
+    default: ${{adme_endpoint}}
+  adls_account:
+    description: "ADLS Gen2 storage account for OSDU data"
+    default: ${{adls_account}}
+
+resources:
+  # ---------------------------------------------------------------------------
+  # Environments
+  # ---------------------------------------------------------------------------
+  environments:
+    osdu-spark-env:
+      runtime: "1.3"
+      description: "Spark environment for OSDU data processing"
+      libraries:
+        - semantic-link-labs
+        - azure-identity
+        - azure-storage-file-datalake
+        - requests
+
+  # ---------------------------------------------------------------------------
+  # Lakehouses
+  # ---------------------------------------------------------------------------
+  lakehouses:
+    osdu-raw-lakehouse:
+      description: "Raw OSDU entities from ADME — JSON format, append-only"
+      enable_schemas: true
+      shortcuts:
+        - name: adme-raw
+          target: "abfss://osdu-data@${var.adls_account}.dfs.core.windows.net/raw"
+
+    osdu-curated-lakehouse:
+      description: "Flattened and typed OSDU entities — SQL-queryable Delta tables"
+      enable_schemas: true
+
+    production-lakehouse:
+      description: "Production volumes, allocations, and time-series data"
+      enable_schemas: true
+
+  # ---------------------------------------------------------------------------
+  # Notebooks: OSDU Entity ETL
+  # ---------------------------------------------------------------------------
+  notebooks:
+    ingest-osdu-entities:
+      path: ./notebooks/ingest_osdu_entities.py
+      description: "Pull well, wellbore, and survey entities from ADME REST API"
+      environment: osdu-spark-env
+      default_lakehouse: osdu-raw-lakehouse
+
+    flatten-wells:
+      path: ./notebooks/flatten_wells.py
+      description: "Flatten OSDU Well master data JSON into typed Delta tables"
+      environment: osdu-spark-env
+      default_lakehouse: osdu-curated-lakehouse
+
+    flatten-wellbores:
+      path: ./notebooks/flatten_wellbores.py
+      description: "Flatten OSDU Wellbore entities with parent well relationships"
+      environment: osdu-spark-env
+      default_lakehouse: osdu-curated-lakehouse
+
+    process-production:
+      path: ./notebooks/process_production.py
+      description: "Process daily/monthly production volumes into analytics-ready tables"
+      environment: osdu-spark-env
+      default_lakehouse: production-lakehouse
+
+  # ---------------------------------------------------------------------------
+  # Pipelines
+  # ---------------------------------------------------------------------------
+  pipelines:
+    daily-osdu-refresh:
+      description: "Daily OSDU entity refresh and flattening pipeline"
+      schedule:
+        frequency: daily
+        cron: "0 5 * * *"
+        timezone: America/Chicago
+      activities:
+        - name: ingest
+          notebook: ingest-osdu-entities
+        - name: flatten-wells
+          notebook: flatten-wells
+          depends_on: [ingest-osdu-entities]
+        - name: flatten-wellbores
+          notebook: flatten-wellbores
+          depends_on: [ingest-osdu-entities]
+        - name: production
+          notebook: process-production
+          depends_on: [flatten-wells, flatten-wellbores]
+
+  # ---------------------------------------------------------------------------
+  # Warehouse: SQL views for BI
+  # ---------------------------------------------------------------------------
+  warehouses:
+    osdu-analytics-warehouse:
+      description: "SQL views joining wells, wellbores, and production for BI consumption"
+      sql_scripts:
+        - ./sql/create_well_views.sql
+        - ./sql/create_production_views.sql
+
+  # ---------------------------------------------------------------------------
+  # Semantic Model + Reports
+  # ---------------------------------------------------------------------------
+  semantic_models:
+    well-analytics-model:
+      path: ./semantic_model/
+      description: "Power BI semantic model for well and production analytics"
+      default_lakehouse: osdu-curated-lakehouse
+
+  reports:
+    well-dashboard:
+      path: ./reports/well_dashboard/
+      description: "Well master data and production performance dashboard"
+      semantic_model: well-analytics-model
+
+    production-report:
+      path: ./reports/production_report/
+      description: "Daily/monthly production volumes and allocation report"
+      semantic_model: well-analytics-model
+
+  # ---------------------------------------------------------------------------
+  # Data Agent
+  # ---------------------------------------------------------------------------
+  data_agents:
+    osdu-data-agent:
+      description: "Natural language interface for well and production data queries"
+      sources:
+        - osdu-curated-lakehouse
+        - production-lakehouse
+        - osdu-analytics-warehouse
+      instructions: ./agent/instructions.md
+      few_shot_examples: ./agent/examples.yaml
+      tables_in_scope:
+        - wells
+        - wellbores
+        - well_headers
+        - production_daily
+        - production_monthly
+
+# ---------------------------------------------------------------------------
+# Connections
+# ---------------------------------------------------------------------------
+connections:
+  adme-connection:
+    type: custom
+    endpoint: "${var.adme_endpoint}"
+    auth_method: "managed_identity"
+    properties:
+      data_partition: "opendes"
+
+  adls-connection:
+    type: adls_gen2
+    endpoint: "https://${var.adls_account}.dfs.core.windows.net"
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+security:
+  roles:
+    - name: subsurface-engineers
+      entra_group: sg-subsurface-eng
+      workspace_role: contributor
+    - name: production-engineers
+      entra_group: sg-production-eng
+      workspace_role: contributor
+      onelake_roles:
+        - tables: [production_daily, production_monthly]
+          permissions: [read, write]
+    - name: data-consumers
+      entra_group: sg-oge-analysts
+      workspace_role: viewer
+      onelake_roles:
+        - tables: ["*"]
+          permissions: [read]
+
+# ---------------------------------------------------------------------------
+# Targets
+# ---------------------------------------------------------------------------
+targets:
+  dev:
+    default: true
+    workspace:
+      name: ${{project_name}}-dev
+      capacity: F2
+    variables:
+      adme_endpoint: "https://myorg-dev.energy.azure.com"
+      adls_account: "myorgadmedev"
+
+  staging:
+    workspace:
+      name: ${{project_name}}-staging
+      capacity: F16
+    variables:
+      adme_endpoint: "https://myorg-staging.energy.azure.com"
+      adls_account: "myorgadmestaging"
+
+  prod:
+    workspace:
+      name: ${{project_name}}-prod
+    run_as:
+      service_principal: sp-osdu-fabric-prod
+    variables:
+      adme_endpoint: ${{adme_endpoint}}
+      adls_account: ${{adls_account}}

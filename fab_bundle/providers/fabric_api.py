@@ -319,6 +319,50 @@ class FabricClient:
         return result or {}
 
     # -----------------------------------------------------------------------
+    # OneLake shortcuts
+    # -----------------------------------------------------------------------
+
+    def create_shortcut(
+        self,
+        workspace_id: str,
+        item_id: str,
+        shortcut_name: str,
+        path: str,
+        target: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Create a OneLake shortcut in a lakehouse.
+
+        Args:
+            workspace_id: Workspace ID
+            item_id: Lakehouse item ID
+            shortcut_name: Display name of the shortcut
+            path: Target path in the lakehouse (e.g., /Tables or /Files)
+            target: Shortcut target config with type-specific details
+        """
+        body = {
+            "name": shortcut_name,
+            "path": path,
+            "target": target,
+        }
+        return self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/items/{item_id}/shortcuts",
+            data=body,
+        ) or {}
+
+    def list_shortcuts(self, workspace_id: str, item_id: str) -> list[dict[str, Any]]:
+        """List shortcuts in a lakehouse."""
+        result = self._request("GET", f"/workspaces/{workspace_id}/items/{item_id}/shortcuts")
+        return result.get("value", []) if result else []
+
+    def delete_shortcut(self, workspace_id: str, item_id: str, shortcut_name: str, shortcut_path: str) -> None:
+        """Delete a shortcut from a lakehouse."""
+        self._request(
+            "DELETE",
+            f"/workspaces/{workspace_id}/items/{item_id}/shortcuts/{shortcut_path}/{shortcut_name}",
+        )
+
+    # -----------------------------------------------------------------------
     # Workspace role assignments
     # -----------------------------------------------------------------------
 

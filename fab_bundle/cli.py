@@ -27,7 +27,7 @@ console = Console()
 
 
 @click.group("bundle")
-@click.version_option(version="0.2.0", prog_name="fabric-automation-bundles")
+@click.version_option(version="0.3.0", prog_name="fabric-automation-bundles")
 def cli():
     """Fabric Automation Bundles — declarative project definitions for Microsoft Fabric."""
     pass
@@ -615,6 +615,97 @@ def drift(bundle_file: str | None, target: str | None):
 
     console.print()
     console.print("  Run 'fab-bundle deploy' to reconcile, or 'fab-bundle plan' to preview changes.")
+
+
+# ---------------------------------------------------------------------------
+# fab bundle export
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+@click.option("--file", "-f", "bundle_file", default=None, help="Path to fabric.yml")
+@click.option("--target", "-t", default=None, help="Target environment")
+@click.option("--resource", "-r", "resource_name", default=None, help="Export a specific resource (default: all)")
+@click.option("--output", "-o", default=".", help="Output directory")
+def export(bundle_file: str | None, target: str | None, resource_name: str | None, output: str):
+    """Export item definitions from deployed workspace to local files."""
+    import base64
+    from fab_bundle.engine.loader import BundleLoadError, load_bundle
+    from fab_bundle.providers.fabric_api import FabricClient
+
+    try:
+        bundle = load_bundle(bundle_file, target)
+    except BundleLoadError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    try:
+        client = FabricClient()
+    except Exception as e:
+        console.print(f"[red]Authentication error:[/red] {e}")
+        sys.exit(1)
+
+    # Resolve workspace
+    ws = bundle.get_effective_workspace(target)
+    workspace_id = ws.workspace_id
+    if not workspace_id and ws.name:
+        found = client.find_workspace(ws.name)
+        if found:
+            workspace_id = found["id"]
+
+    if not workspace_id:
+        console.print(f"[red]Error:[/red] Workspace not found")
+        sys.exit(1)
+
+    existing = client.get_workspace_items_map(workspace_id)
+    output_dir = Path(output)
+    exported = 0
+
+    items_to_export = {}
+    if resource_name:
+        if resource_name not in existing:
+            console.print(f"[red]Error:[/red] '{resource_name}' not found in workspace")
+            sys.exit(1)
+        items_to_export[resource_name] = existing[resource_name]
+    else:
+        items_to_export = existing
+
+    console.print(f"Exporting from workspace: {ws.name or workspace_id}")
+    console.print()
+
+    for name, info in sorted(items_to_export.items()):
+        item_id = info.get("id")
+        item_type = info.get("type", "Unknown")
+        if not item_id:
+            continue
+
+        try:
+            definition = client.get_item_definition(workspace_id, item_id)
+            parts = definition.get("definition", {}).get("parts", [])
+            if not parts:
+                console.print(f"  [dim]=[/dim] {name} ({item_type}): no exportable definition")
+                continue
+
+            item_dir = output_dir / name
+            item_dir.mkdir(parents=True, exist_ok=True)
+
+            for part in parts:
+                part_path = part.get("path", "")
+                payload = part.get("payload", "")
+                payload_type = part.get("payloadType", "")
+
+                if payload and payload_type == "InlineBase64":
+                    file_path = item_dir / part_path
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(base64.b64decode(payload))
+
+            console.print(f"  [green]+[/green] {name} ({item_type}): {len(parts)} files → {item_dir}")
+            exported += 1
+        except Exception as e:
+            console.print(f"  [yellow]![/yellow] {name} ({item_type}): {e}")
+
+    console.print()
+    console.print(f"Exported {exported} item(s) to {output_dir.resolve()}")
 
 
 if __name__ == "__main__":

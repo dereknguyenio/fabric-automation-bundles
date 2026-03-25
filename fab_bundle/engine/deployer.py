@@ -51,6 +51,7 @@ class Deployer:
         project_dir: Path,
         console: Console | None = None,
         dry_run: bool = False,
+        parallel: bool = False,
     ):
         self.client = client
         self.bundle = bundle
@@ -59,6 +60,7 @@ class Deployer:
         self.dry_run = dry_run
         self.state_manager: StateManager | None = None
         self._rollback_stack: list[dict[str, Any]] = []
+        self.parallel = parallel
 
     def _resolve_path(self, relative_path: str) -> Path:
         """Resolve a relative path against the project directory."""
@@ -235,6 +237,22 @@ class Deployer:
                 return resource.description
         return None
 
+    def _resolve_principal_id(self, value: str, principal_type: str) -> str | None:
+        """Resolve a principal display name to a GUID using Microsoft Graph."""
+        from fab_bundle.providers.graph_api import is_guid
+        if is_guid(value):
+            return value
+        try:
+            from fab_bundle.providers.graph_api import GraphClient
+            if not hasattr(self, '_graph_client'):
+                self._graph_client = GraphClient()
+            resolved = self._graph_client.resolve_principal(value, principal_type)
+            if resolved:
+                self.console.print(f"    Resolved '{value}' → {resolved}")
+            return resolved
+        except Exception:
+            return None
+
     def _deploy_security(self, workspace_id: str) -> None:
         """Deploy security role assignments to the workspace."""
         if not self.bundle.security.roles:
@@ -242,8 +260,8 @@ class Deployer:
 
         self.console.print("  Applying security roles...")
         for role in self.bundle.security.roles:
-            principal_id = role.entra_group or role.entra_user or role.service_principal
-            if not principal_id:
+            principal_value = role.entra_group or role.entra_user or role.service_principal
+            if not principal_value:
                 continue
 
             principal_type = "Group"
@@ -251,6 +269,12 @@ class Deployer:
                 principal_type = "User"
             elif role.service_principal:
                 principal_type = "ServicePrincipal"
+
+            # Resolve display name to GUID if needed
+            principal_id = self._resolve_principal_id(principal_value, principal_type)
+            if not principal_id:
+                self.console.print(f"    [yellow]Warning:[/yellow] Could not resolve '{principal_value}' to a GUID. Skipping.")
+                continue
 
             # Map workspace role names to Fabric API role names
             role_map = {
@@ -361,6 +385,45 @@ class Deployer:
                     self.client.execute_sql(workspace_id, warehouse_id, sql)
                 except Exception as e:
                     self.console.print(f"  [yellow]Warning:[/yellow] SQL script '{script_path}' failed: {e}")
+
+    def _deploy_shortcuts(self, workspace_id: str) -> None:
+        """Deploy OneLake shortcuts for lakehouses."""
+        for key, lakehouse in self.bundle.resources.lakehouses.items():
+            if not lakehouse.shortcuts:
+                continue
+
+            # Find the lakehouse item ID
+            try:
+                items = self.client.get_workspace_items_map(workspace_id)
+                lh_info = items.get(key)
+                if not lh_info:
+                    continue
+                lh_id = lh_info["id"]
+            except Exception:
+                continue
+
+            for shortcut in lakehouse.shortcuts:
+                if self.dry_run:
+                    self.console.print(f"  [dim]Would create shortcut: {shortcut.name} in {key}[/dim]")
+                    continue
+
+                try:
+                    # Parse target URI to determine shortcut type
+                    target_config = {"type": "ExternalTarget"}
+                    if shortcut.target.startswith("adls://"):
+                        parts = shortcut.target.replace("adls://", "").split("/", 2)
+                        target_config = {
+                            "adlsGen2": {
+                                "location": f"https://{parts[0]}.dfs.core.windows.net",
+                                "subpath": f"/{'/'.join(parts[1:])}" if len(parts) > 1 else "/",
+                            }
+                        }
+
+                    path = shortcut.subfolder or "/Tables"
+                    self.client.create_shortcut(workspace_id, lh_id, shortcut.name, path, target_config)
+                    self.console.print(f"    Created shortcut: {shortcut.name} in {key}")
+                except Exception as e:
+                    self.console.print(f"    [yellow]Warning:[/yellow] Shortcut '{shortcut.name}' failed: {e}")
 
     def _rollback(self, workspace_id: str, result: DeployResult) -> None:
         """Attempt to rollback created items on failure."""
@@ -594,6 +657,7 @@ class Deployer:
             self._deploy_security(workspace_id)
             self._deploy_git_integration(workspace_id)
             self._deploy_connections()
+            self._deploy_shortcuts(workspace_id)
             self._execute_sql_scripts(workspace_id)
 
         # Save state

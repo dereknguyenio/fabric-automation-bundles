@@ -41,7 +41,7 @@ MINIMAL_BUNDLE = {
     "bundle": {"name": "test-bundle", "version": "1.0.0"},
     "resources": {
         "lakehouses": {
-            "my-lakehouse": {"description": "test lakehouse"},
+            "my_lakehouse": {"description": "test lakehouse"},
         },
     },
 }
@@ -145,7 +145,7 @@ class TestBundleModels:
         bundle = BundleDefinition.model_validate(MINIMAL_BUNDLE)
         assert bundle.bundle.name == "test-bundle"
         assert bundle.bundle.version == "1.0.0"
-        assert "my-lakehouse" in bundle.resources.lakehouses
+        assert "my_lakehouse" in bundle.resources.lakehouses
 
     def test_full_bundle(self):
         bundle = BundleDefinition.model_validate(FULL_BUNDLE)
@@ -272,14 +272,14 @@ class TestLoader:
         # Included file
         resources = {
             "resources": {
-                "lakehouses": {"included-lh": {"description": "from include"}},
+                "lakehouses": {"included_lh": {"description": "from include"}},
             },
         }
         with open(tmp_path / "resources.yml", "w") as f:
             yaml.dump(resources, f)
 
         bundle = load_bundle(tmp_path / "fabric.yml")
-        assert "included-lh" in bundle.resources.lakehouses
+        assert "included_lh" in bundle.resources.lakehouses
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +356,7 @@ class TestPlanner:
     def test_plan_auto_delete(self):
         bundle = BundleDefinition.model_validate(MINIMAL_BUNDLE)
         existing = {
-            "my-lakehouse": {"id": "id-1", "type": "Lakehouse"},
+            "my_lakehouse": {"id": "id-1", "type": "Lakehouse"},
             "orphaned-notebook": {"id": "id-2", "type": "Notebook"},
         }
         plan = create_plan(bundle, None, workspace_items=existing, auto_delete=True)

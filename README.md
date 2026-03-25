@@ -215,71 +215,44 @@ include:
 
 ## Developer Workflow & CI/CD Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Developer Workflow                             │
-│                                                                         │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────────┐  │
-│  │  Author   │    │ Validate │    │   Plan   │    │  Deploy to Dev   │  │
-│  │fabric.yml │───▶│  locally │───▶│  (diff)  │───▶│   (iterate)     │  │
-│  │+ code     │    │          │    │          │    │                  │  │
-│  └──────────┘    └──────────┘    └──────────┘    └──────────────────┘  │
-│       │                                                    │           │
-│       ▼                                                    ▼           │
-│   git commit                                       fab-bundle drift   │
-│       │                                           (detect changes)     │
-│       ▼                                                                │
-│   git push / PR                                                        │
-└───────┬─────────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        CI/CD Pipeline                                   │
-│                                                                         │
-│  ┌──────────────────┐                                                   │
-│  │  PR Opened        │                                                  │
-│  │  ┌──────────────┐ │                                                  │
-│  │  │ validate     │ │  ← Catch schema errors, broken refs before merge │
-│  │  │ plan -t dev  │ │  ← Preview what would change (no side effects)   │
-│  │  └──────────────┘ │                                                  │
-│  └────────┬─────────┘                                                  │
-│           │ merge to main                                               │
-│           ▼                                                             │
-│  ┌──────────────────┐                                                   │
-│  │  Deploy Staging   │                                                  │
-│  │  ┌──────────────┐ │                                                  │
-│  │  │ plan -t stg  │ │  ← Show diff in CI logs                         │
-│  │  │ deploy -t stg│ │  ← Auto-deploy, service principal auth          │
-│  │  └──────────────┘ │                                                  │
-│  └────────┬─────────┘                                                  │
-│           │ approval gate                                               │
-│           ▼                                                             │
-│  ┌──────────────────┐                                                   │
-│  │  Deploy Prod      │                                                  │
-│  │  ┌──────────────┐ │                                                  │
-│  │  │ plan -t prod │ │  ← Final diff review                            │
-│  │  │ deploy -t prod│ │  ← Requires manual approval in GitHub/ADO      │
-│  │  └──────────────┘ │                                                  │
-│  └──────────────────┘                                                  │
-└─────────────────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     Microsoft Fabric                                    │
-│                                                                         │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                  │
-│  │  Dev         │   │  Staging     │   │  Production  │                 │
-│  │  Workspace   │   │  Workspace   │   │  Workspace   │                 │
-│  │             │   │             │   │             │                    │
-│  │ Lakehouses  │   │ Lakehouses  │   │ Lakehouses  │                   │
-│  │ Notebooks   │   │ Notebooks   │   │ Notebooks   │                   │
-│  │ Pipelines   │   │ Pipelines   │   │ Pipelines   │                   │
-│  │ Warehouses  │   │ Warehouses  │   │ Warehouses  │                   │
-│  │ Models      │   │ Models      │   │ Models      │                   │
-│  │ Reports     │   │ Reports     │   │ Reports     │                   │
-│  │ Agents      │   │ Agents      │   │ Agents      │                   │
-│  └─────────────┘   └─────────────┘   └─────────────┘                  │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph local["🖥️ Local Development"]
+        A["Author fabric.yml\n+ notebooks, SQL, etc."] --> B["fab-bundle validate"]
+        B --> C["fab-bundle plan -t dev"]
+        C --> D["fab-bundle deploy -t dev"]
+        D --> E["fab-bundle drift"]
+        E -.->|"iterate"| A
+        D --> F["git commit + push"]
+    end
+
+    subgraph cicd["⚙️ CI/CD Pipeline"]
+        G["PR Opened"] --> H["fab-bundle validate"]
+        H --> I["fab-bundle plan -t staging"]
+        I --> J{Merge to main}
+        J --> K["fab-bundle deploy -t staging -y"]
+        K --> L{Approval Gate}
+        L --> M["fab-bundle deploy -t prod -y"]
+    end
+
+    subgraph fabric["☁️ Microsoft Fabric"]
+        direction LR
+        DEV["Dev Workspace\n─────────────\nLakehouses\nNotebooks\nPipelines\nWarehouses\nSemantic Models\nReports\nData Agents"]
+        STG["Staging Workspace\n─────────────\nLakehouses\nNotebooks\nPipelines\nWarehouses\nSemantic Models\nReports\nData Agents"]
+        PRD["Prod Workspace\n─────────────\nLakehouses\nNotebooks\nPipelines\nWarehouses\nSemantic Models\nReports\nData Agents"]
+    end
+
+    F --> G
+    D -.->|"Fabric REST API"| DEV
+    K -.->|"Service Principal"| STG
+    M -.->|"Service Principal"| PRD
+
+    style local fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
+    style cicd fill:#0f3460,stroke:#16213e,color:#e0e0e0
+    style fabric fill:#533483,stroke:#16213e,color:#e0e0e0
+    style DEV fill:#2d6a4f,stroke:#1b4332,color:#e0e0e0
+    style STG fill:#e9c46a,stroke:#f4a261,color:#1a1a2e
+    style PRD fill:#e76f51,stroke:#f4a261,color:#1a1a2e
 ```
 
 ### How `fab-bundle` fits in the pipeline

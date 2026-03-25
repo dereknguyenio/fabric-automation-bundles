@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fabric-automation-bundles"
-version = "0.6.0"
+version = "0.6.1"
 description = "Declarative project definitions for Microsoft Fabric"
 readme = "README.md"
 license = {text = "MIT"}
@@ -38,6 +38,7 @@ dependencies = [
 
 [project.optional-dependencies]
 keyvault = ["azure-keyvault-secrets"]
+mcp = ["mcp>=1.0.0"]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -48,12 +49,13 @@ dev = [
 
 [project.scripts]
 fab-bundle = "fab_bundle.cli:cli"
+fab-bundle-mcp = "fab_bundle.mcp_server.server:main"
 
 [project.urls]
-Homepage = "https://github.com/microsoft/fabric-automation-bundles"
-Repository = "https://github.com/microsoft/fabric-automation-bundles"
-Documentation = "https://microsoft.github.io/fabric-automation-bundles/"
-Issues = "https://github.com/microsoft/fabric-automation-bundles/issues"
+Homepage = "https://github.com/dereknguyenio/fabric-automation-bundles"
+Repository = "https://github.com/dereknguyenio/fabric-automation-bundles"
+Documentation = "https://dereknguyenio.github.io/fabric-automation-bundles/"
+Issues = "https://github.com/dereknguyenio/fabric-automation-bundles/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

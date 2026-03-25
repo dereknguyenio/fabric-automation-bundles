@@ -4,7 +4,8 @@ bundle:
   description: "Medallion lakehouse architecture — bronze/silver/gold"
 
 workspace:
-  capacity: ${{capacity_sku}}
+  # Your Fabric capacity GUID — find it in the Fabric Admin Portal → Capacities
+  capacity_id: ${{capacity_id}}
 
 variables:
   source_connection:
@@ -139,14 +140,14 @@ targets:
     default: true
     workspace:
       name: ${{project_name}}-dev
-      capacity: F2
+      # capacity_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # override per target
     variables:
       source_connection: "dev-connection-string"
 
   staging:
     workspace:
       name: ${{project_name}}-staging
-      capacity: F16
+      # capacity_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # override per target
     variables:
       source_connection: "staging-connection-string"
 

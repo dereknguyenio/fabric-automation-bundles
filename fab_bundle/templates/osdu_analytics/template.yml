@@ -9,9 +9,9 @@ variables:
   adme_endpoint:
     description: "Azure Data Manager for Energy endpoint"
     default: "https://myorg.energy.azure.com"
-  capacity_sku:
-    description: "Fabric capacity SKU"
-    default: "F64"
+  capacity_id:
+    description: "Fabric capacity GUID (from Admin Portal → Capacities)"
+    default: ""
   adls_account:
     description: "ADLS Gen2 storage account for OSDU raw data"
     default: "myorgadme"

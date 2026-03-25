@@ -81,9 +81,15 @@ class WorkspaceConfig(BaseModel):
     """Workspace-level configuration."""
     name: str | None = Field(None, description="Workspace display name")
     workspace_id: str | None = Field(None, description="Existing workspace ID to bind to")
-    capacity: str | None = Field(None, description="Capacity SKU or ID")
+    capacity_id: str | None = Field(None, description="Fabric capacity GUID (from admin portal)")
+    capacity: str | None = Field(None, description="Deprecated: use capacity_id instead")
     description: str | None = None
     git_integration: GitIntegrationConfig | None = None
+
+    @property
+    def effective_capacity_id(self) -> str | None:
+        """Return capacity_id, falling back to capacity for backwards compat."""
+        return self.capacity_id or self.capacity
 
 
 class GitIntegrationConfig(BaseModel):
@@ -437,6 +443,7 @@ class BundleDefinition(BaseModel):
             return WorkspaceConfig(
                 name=target.workspace.name or base.name,
                 workspace_id=target.workspace.workspace_id or base.workspace_id,
+                capacity_id=target.workspace.capacity_id or base.capacity_id,
                 capacity=target.workspace.capacity or base.capacity,
                 description=target.workspace.description or base.description,
                 git_integration=target.workspace.git_integration or base.git_integration,

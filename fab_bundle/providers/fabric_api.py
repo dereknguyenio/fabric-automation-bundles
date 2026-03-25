@@ -333,3 +333,137 @@ class FabricClient:
                 "description": item.get("description"),
             }
         return result
+
+    # -----------------------------------------------------------------------
+    # Workspace deletion
+    # -----------------------------------------------------------------------
+
+    def delete_workspace(self, workspace_id: str) -> None:
+        """Delete a workspace."""
+        self._request("DELETE", f"/workspaces/{workspace_id}")
+
+    # -----------------------------------------------------------------------
+    # Git integration
+    # -----------------------------------------------------------------------
+
+    def connect_workspace_to_git(
+        self,
+        workspace_id: str,
+        provider: str,
+        organization: str,
+        project: str | None,
+        repository: str,
+        branch: str = "main",
+        directory: str = "/",
+    ) -> dict[str, Any] | None:
+        """Connect a workspace to a Git repository."""
+        git_provider_details: dict[str, Any] = {
+            "organizationName": organization,
+            "repositoryName": repository,
+            "branchName": branch,
+            "directoryName": directory,
+        }
+        if project:
+            git_provider_details["projectName"] = project
+
+        body = {
+            "gitProviderDetails": git_provider_details,
+        }
+        return self._request("POST", f"/workspaces/{workspace_id}/git/connect", data=body)
+
+    def initialize_git_connection(self, workspace_id: str) -> dict[str, Any] | None:
+        """Initialize a git connection (initial sync)."""
+        result = self._request("POST", f"/workspaces/{workspace_id}/git/initializeConnection", data={})
+        if result and "operation_url" in result:
+            return self._wait_for_operation(result["operation_url"])
+        return result
+
+    def get_git_status(self, workspace_id: str) -> dict[str, Any] | None:
+        """Get git sync status for a workspace."""
+        return self._request("GET", f"/workspaces/{workspace_id}/git/status")
+
+    def disconnect_workspace_from_git(self, workspace_id: str) -> None:
+        """Disconnect a workspace from Git."""
+        self._request("POST", f"/workspaces/{workspace_id}/git/disconnect")
+
+    # -----------------------------------------------------------------------
+    # Connections
+    # -----------------------------------------------------------------------
+
+    def list_connections(self) -> list[dict[str, Any]]:
+        """List all connections accessible to the user."""
+        result = self._request("GET", "/connections")
+        return result.get("value", []) if result else []
+
+    def create_connection(
+        self,
+        display_name: str,
+        connection_type: str,
+        connectivity_type: str = "ShareableCloud",
+        connection_details: dict[str, Any] | None = None,
+        credential_details: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new connection."""
+        body: dict[str, Any] = {
+            "displayName": display_name,
+            "connectivityType": connectivity_type,
+            "connectionDetails": connection_details or {},
+        }
+        if credential_details:
+            body["credentialDetails"] = credential_details
+        return self._request("POST", "/connections", data=body) or {}
+
+    def delete_connection(self, connection_id: str) -> None:
+        """Delete a connection."""
+        self._request("DELETE", f"/connections/{connection_id}")
+
+    # -----------------------------------------------------------------------
+    # Job scheduler
+    # -----------------------------------------------------------------------
+
+    def run_item_job(
+        self,
+        workspace_id: str,
+        item_id: str,
+        job_type: str,
+        execution_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Trigger a job run for an item (notebook, pipeline, etc.)."""
+        body: dict[str, Any] = {}
+        if execution_data:
+            body["executionData"] = execution_data
+        result = self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/items/{item_id}/jobs/instances?jobType={job_type}",
+            data=body if body else None,
+        )
+        return result
+
+    def get_item_job_instance(
+        self,
+        workspace_id: str,
+        item_id: str,
+        job_instance_id: str,
+    ) -> dict[str, Any]:
+        """Get the status of a job instance."""
+        return self._request(
+            "GET",
+            f"/workspaces/{workspace_id}/items/{item_id}/jobs/instances/{job_instance_id}",
+        ) or {}
+
+    # -----------------------------------------------------------------------
+    # SQL endpoint execution
+    # -----------------------------------------------------------------------
+
+    def execute_sql(
+        self,
+        workspace_id: str,
+        warehouse_id: str,
+        sql: str,
+    ) -> dict[str, Any] | None:
+        """Execute a SQL statement against a Warehouse SQL endpoint."""
+        return self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/warehouses/{warehouse_id}/executeQuery",
+            data={"query": sql, "maxRows": 1000},
+        )

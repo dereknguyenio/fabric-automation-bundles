@@ -19,6 +19,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from fab_bundle.engine.planner import DeploymentPlan, PlanAction, PlanItem
 from fab_bundle.models.bundle import BundleDefinition
 from fab_bundle.providers.fabric_api import FabricApiError, FabricClient, ITEM_TYPE_MAP
+from fab_bundle.engine.state import StateManager, compute_definition_hash
 
 
 @dataclass
@@ -31,6 +32,7 @@ class DeployResult:
     items_failed: int = 0
     errors: list[str] = field(default_factory=list)
     item_ids: dict[str, str] = field(default_factory=dict)  # resource_key -> item_id
+    rollback_log: list[str] = field(default_factory=list)
 
 
 class Deployer:
@@ -55,6 +57,8 @@ class Deployer:
         self.project_dir = project_dir
         self.console = console or Console()
         self.dry_run = dry_run
+        self.state_manager: StateManager | None = None
+        self._rollback_stack: list[dict[str, Any]] = []
 
     def _resolve_path(self, relative_path: str) -> Path:
         """Resolve a relative path against the project directory."""
@@ -195,6 +199,153 @@ class Deployer:
                 return resource.description
         return None
 
+    def _deploy_security(self, workspace_id: str) -> None:
+        """Deploy security role assignments to the workspace."""
+        if not self.bundle.security.roles:
+            return
+
+        self.console.print("  Applying security roles...")
+        for role in self.bundle.security.roles:
+            principal_id = role.entra_group or role.entra_user or role.service_principal
+            if not principal_id:
+                continue
+
+            principal_type = "Group"
+            if role.entra_user:
+                principal_type = "User"
+            elif role.service_principal:
+                principal_type = "ServicePrincipal"
+
+            # Map workspace role names to Fabric API role names
+            role_map = {
+                "admin": "Admin",
+                "member": "Member",
+                "contributor": "Contributor",
+                "viewer": "Viewer",
+            }
+            fabric_role = role_map.get(role.workspace_role.value, "Viewer")
+
+            if self.dry_run:
+                self.console.print(f"    [dim]Would assign {fabric_role} to {principal_id}[/dim]")
+            else:
+                try:
+                    self.client.add_workspace_role_assignment(
+                        workspace_id, principal_id, principal_type, fabric_role,
+                    )
+                    self.console.print(f"    Assigned {fabric_role} to {principal_id}")
+                except Exception as e:
+                    self.console.print(f"    [yellow]Warning:[/yellow] Could not assign role: {e}")
+
+    def _deploy_git_integration(self, workspace_id: str) -> None:
+        """Configure git integration for the workspace."""
+        ws_config = self.bundle.workspace
+        if not ws_config.git_integration:
+            return
+
+        git = ws_config.git_integration
+        if self.dry_run:
+            self.console.print(f"  [dim]Would connect workspace to git: {git.repository}[/dim]")
+            return
+
+        self.console.print(f"  Connecting workspace to git: {git.repository}")
+        try:
+            self.client.connect_workspace_to_git(
+                workspace_id=workspace_id,
+                provider=git.provider,
+                organization=git.organization or "",
+                project=git.project,
+                repository=git.repository or "",
+                branch=git.branch,
+                directory=git.directory,
+            )
+            self.client.initialize_git_connection(workspace_id)
+            self.console.print("  Git integration configured.")
+        except Exception as e:
+            self.console.print(f"  [yellow]Warning:[/yellow] Git integration failed: {e}")
+
+    def _deploy_connections(self) -> dict[str, str]:
+        """Deploy connections defined in the bundle. Returns name -> connection_id map."""
+        if not self.bundle.connections:
+            return {}
+
+        connection_ids: dict[str, str] = {}
+        self.console.print("  Deploying connections...")
+
+        for name, conn_config in self.bundle.connections.items():
+            if self.dry_run:
+                self.console.print(f"    [dim]Would create connection: {name}[/dim]")
+                continue
+
+            try:
+                connection_details = {"type": conn_config.type.value}
+                if conn_config.endpoint:
+                    connection_details["endpoint"] = conn_config.endpoint
+                if conn_config.database:
+                    connection_details["database"] = conn_config.database
+                connection_details.update(conn_config.properties)
+
+                result = self.client.create_connection(
+                    display_name=name,
+                    connection_type=conn_config.type.value,
+                    connection_details=connection_details,
+                )
+                conn_id = result.get("id", "")
+                connection_ids[name] = conn_id
+                self.console.print(f"    Created connection: {name}")
+            except Exception as e:
+                self.console.print(f"    [yellow]Warning:[/yellow] Connection '{name}' failed: {e}")
+
+        return connection_ids
+
+    def _execute_sql_scripts(self, workspace_id: str) -> None:
+        """Execute SQL scripts for warehouse resources."""
+        for key, warehouse in self.bundle.resources.warehouses.items():
+            if not warehouse.sql_scripts:
+                continue
+
+            # Find the warehouse item ID
+            try:
+                items = self.client.get_workspace_items_map(workspace_id)
+                warehouse_info = items.get(key)
+                if not warehouse_info:
+                    self.console.print(f"  [yellow]Warning:[/yellow] Warehouse '{key}' not found, skipping SQL scripts")
+                    continue
+                warehouse_id = warehouse_info["id"]
+            except Exception:
+                continue
+
+            for script_path in warehouse.sql_scripts:
+                if self.dry_run:
+                    self.console.print(f"  [dim]Would execute SQL: {script_path}[/dim]")
+                    continue
+
+                try:
+                    sql = self._read_file_text(script_path)
+                    self.console.print(f"  Executing SQL: {script_path}")
+                    self.client.execute_sql(workspace_id, warehouse_id, sql)
+                except Exception as e:
+                    self.console.print(f"  [yellow]Warning:[/yellow] SQL script '{script_path}' failed: {e}")
+
+    def _rollback(self, workspace_id: str, result: DeployResult) -> None:
+        """Attempt to rollback created items on failure."""
+        if not self._rollback_stack:
+            return
+
+        self.console.print()
+        self.console.print("[yellow]Rolling back created items...[/yellow]")
+
+        for entry in reversed(self._rollback_stack):
+            item_id = entry.get("item_id")
+            key = entry.get("resource_key", "unknown")
+            if item_id:
+                try:
+                    self.client.delete_item(workspace_id, item_id)
+                    result.rollback_log.append(f"Rolled back: {key}")
+                    self.console.print(f"  [yellow]-[/yellow] Rolled back: {key}")
+                except Exception as e:
+                    result.rollback_log.append(f"Rollback failed for {key}: {e}")
+                    self.console.print(f"  [red]Rollback failed:[/red] {key}: {e}")
+
     def _ensure_workspace(self, target_name: str | None = None) -> str:
         """Ensure the target workspace exists and return its ID."""
         ws_config = self.bundle.get_effective_workspace(target_name)
@@ -252,7 +403,14 @@ class Deployer:
                 definition=definition,
                 description=description,
             )
-            return bool(result.get("id"))
+            item_id = result.get("id")
+            if item_id:
+                self._rollback_stack.append({
+                    "resource_key": item.resource_key,
+                    "item_id": item_id,
+                    "action": "created",
+                })
+            return bool(item_id)
 
         elif item.action == PlanAction.UPDATE:
             existing = existing_items.get(item.resource_key, {})
@@ -370,7 +528,45 @@ class Deployer:
 
                 progress.advance(task)
 
+        # Rollback on failure if items were created
+        if result.items_failed > 0 and self._rollback_stack:
+            self._rollback(workspace_id, result)
+
         result.success = result.items_failed == 0
+
+        # Deploy security, git, connections, SQL scripts (only on success)
+        if result.success and not self.dry_run:
+            self._deploy_security(workspace_id)
+            self._deploy_git_integration(workspace_id)
+            self._deploy_connections()
+            self._execute_sql_scripts(workspace_id)
+
+        # Save state
+        if result.success and not self.dry_run and self.state_manager:
+            deployed_items: dict[str, dict[str, Any]] = {}
+            try:
+                current_items = self.client.get_workspace_items_map(workspace_id)
+                for item in plan.items:
+                    if item.action in (PlanAction.CREATE, PlanAction.UPDATE):
+                        live = current_items.get(item.resource_key, {})
+                        definition = self._get_item_definition(item.resource_key, item.resource_type)
+                        deployed_items[item.resource_key] = {
+                            "id": live.get("id", ""),
+                            "type": item.resource_type,
+                            "definition_hash": compute_definition_hash(definition),
+                        }
+            except Exception:
+                pass
+
+            if deployed_items:
+                ws_config = self.bundle.get_effective_workspace(target_name)
+                self.state_manager.record_deployment(
+                    bundle_name=self.bundle.bundle.name,
+                    bundle_version=self.bundle.bundle.version,
+                    workspace_id=workspace_id,
+                    workspace_name=ws_config.name or "",
+                    deployed_items=deployed_items,
+                )
 
         # Summary
         self.console.print()
@@ -378,6 +574,10 @@ class Deployer:
             self.console.print("[bold green]Deployment complete.[/bold green]")
         else:
             self.console.print("[bold red]Deployment completed with errors.[/bold red]")
+            if result.rollback_log:
+                self.console.print("[yellow]Rollback actions:[/yellow]")
+                for entry in result.rollback_log:
+                    self.console.print(f"  {entry}")
 
         self.console.print(
             f"  Created: {result.items_created}  Updated: {result.items_updated}  "

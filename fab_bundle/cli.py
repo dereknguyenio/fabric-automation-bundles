@@ -27,7 +27,7 @@ console = Console()
 
 
 @click.group("bundle")
-@click.version_option(version="0.1.0", prog_name="fabric-automation-bundles")
+@click.version_option(version="0.2.0", prog_name="fabric-automation-bundles")
 def cli():
     """Fabric Automation Bundles — declarative project definitions for Microsoft Fabric."""
     pass
@@ -190,6 +190,11 @@ def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_appr
     bundle_path = Path(bundle_file) if bundle_file else Path.cwd()
     project_dir = bundle_path.parent if bundle_path.is_file() else bundle_path
 
+    # Set up state manager
+    from fab_bundle.engine.state import StateManager
+    target_label = target or "default"
+    state_mgr = StateManager(project_dir, target_label)
+
     # Connect to Fabric
     try:
         client = FabricClient()
@@ -226,6 +231,7 @@ def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_appr
 
     # Deploy
     deployer = Deployer(client, bundle, project_dir, console, dry_run=dry_run)
+    deployer.state_manager = state_mgr
     result = deployer.execute(deployment_plan, target)
 
     if not result.success:
@@ -241,7 +247,8 @@ def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_appr
 @click.option("--file", "-f", "bundle_file", default=None, help="Path to fabric.yml")
 @click.option("--target", "-t", default=None, help="Target environment")
 @click.option("--auto-approve", "-y", is_flag=True, default=False, help="Skip confirmation")
-def destroy(bundle_file: str | None, target: str | None, auto_approve: bool):
+@click.option("--delete-workspace", is_flag=True, default=False, help="Also delete the workspace itself")
+def destroy(bundle_file: str | None, target: str | None, auto_approve: bool, delete_workspace: bool):
     """Destroy all bundle-managed resources in the target workspace."""
     from fab_bundle.engine.loader import BundleLoadError, load_bundle
     from fab_bundle.engine.resolver import get_deployment_order
@@ -318,6 +325,28 @@ def destroy(bundle_file: str | None, target: str | None, auto_approve: bool):
         console.print(f"[bold red]Destroy completed with errors.[/bold red] Deleted: {destroyed}, Failed: {failed}")
     else:
         console.print(f"[bold green]Destroy complete.[/bold green] Deleted: {destroyed} resources.")
+
+    # Optionally delete the workspace
+    if delete_workspace and failed == 0:
+        if not auto_approve:
+            if not click.confirm(f"Also delete workspace '{ws.name}'?"):
+                return
+        try:
+            client.delete_workspace(workspace_id)
+            console.print(f"  [red]Workspace deleted: {ws.name}[/red]")
+        except Exception as e:
+            console.print(f"  [red]Failed to delete workspace:[/red] {e}")
+
+    # Clean up state
+    from fab_bundle.engine.state import StateManager
+    state_mgr = StateManager(
+        Path(bundle_file).parent if bundle_file else Path.cwd(),
+        target or "default",
+    )
+    state = state_mgr.load()
+    for node in reversed_order:
+        if node.key in existing:
+            state_mgr.remove_resource(node.key)
 
 
 # ---------------------------------------------------------------------------
@@ -420,18 +449,14 @@ def run(resource_name: str, bundle_file: str | None, target: str | None):
 
     # Trigger execution via Job Scheduler API
     try:
-        result = client._request(
-            "POST",
-            f"/workspaces/{workspace_id}/items/{item_id}/jobs/instances?jobType=RunNotebook"
-            if item_type == "Notebook"
-            else f"/workspaces/{workspace_id}/items/{item_id}/jobs/instances?jobType=Pipeline",
-        )
+        job_type = "RunNotebook" if item_type == "Notebook" else "Pipeline"
+        result = client.run_item_job(workspace_id, item_id, job_type)
 
         if result and "operation_url" in result:
             console.print("[dim]Job submitted. Waiting for completion...[/dim]")
             try:
                 final = client._wait_for_operation(result["operation_url"], timeout=600)
-                console.print(f"[bold green]Run complete.[/bold green]")
+                console.print("[bold green]Run complete.[/bold green]")
             except Exception as e:
                 console.print(f"[yellow]Job submitted but could not track completion:[/yellow] {e}")
                 console.print("  Check the Fabric portal for run status.")
@@ -440,6 +465,7 @@ def run(resource_name: str, bundle_file: str | None, target: str | None):
 
     except Exception as e:
         console.print(f"[red]Error triggering run:[/red] {e}")
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -530,6 +556,65 @@ def bind(resource_name: str, workspace: str, bundle_file: str | None):
     console.print()
     console.print("  This resource will be managed by the bundle on the next deploy.")
     console.print("  Changes to fabric.yml will be applied to the existing item.")
+
+
+# ---------------------------------------------------------------------------
+# fab bundle drift
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+@click.option("--file", "-f", "bundle_file", default=None, help="Path to fabric.yml")
+@click.option("--target", "-t", default=None, help="Target environment")
+def drift(bundle_file: str | None, target: str | None):
+    """Detect drift between deployed state and live workspace."""
+    from fab_bundle.engine.loader import BundleLoadError, load_bundle
+    from fab_bundle.engine.state import StateManager
+    from fab_bundle.providers.fabric_api import FabricClient
+
+    try:
+        bundle = load_bundle(bundle_file, target)
+    except BundleLoadError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    bundle_path = Path(bundle_file) if bundle_file else Path.cwd()
+    project_dir = bundle_path.parent if bundle_path.is_file() else bundle_path
+
+    state_mgr = StateManager(project_dir, target or "default")
+    state = state_mgr.load()
+
+    if not state.workspace_id:
+        console.print("[yellow]No deployment state found.[/yellow] Run 'fab-bundle deploy' first.")
+        return
+
+    try:
+        client = FabricClient()
+    except Exception as e:
+        console.print(f"[red]Authentication error:[/red] {e}")
+        sys.exit(1)
+
+    try:
+        live_items = client.get_workspace_items_map(state.workspace_id)
+    except Exception as e:
+        console.print(f"[red]Error fetching workspace:[/red] {e}")
+        sys.exit(1)
+
+    drift_report = state_mgr.detect_drift(live_items)
+
+    if not drift_report:
+        console.print("[bold green]No drift detected.[/bold green] Workspace matches deployed state.")
+        return
+
+    console.print(f"[bold yellow]Drift detected:[/bold yellow] {len(drift_report)} item(s)")
+    console.print()
+    for key, drift_type in sorted(drift_report.items()):
+        color = {"added": "green", "removed": "red", "modified": "yellow"}.get(drift_type, "white")
+        symbol = {"added": "+", "removed": "-", "modified": "~"}.get(drift_type, "?")
+        console.print(f"  [{color}]{symbol}[/{color}] {key}: {drift_type}")
+
+    console.print()
+    console.print("  Run 'fab-bundle deploy' to reconcile, or 'fab-bundle plan' to preview changes.")
 
 
 if __name__ == "__main__":

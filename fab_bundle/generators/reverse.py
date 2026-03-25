@@ -8,6 +8,7 @@ This is 'fab bundle generate' — the on-ramp for existing projects.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +17,13 @@ from rich.console import Console
 
 from fab_bundle.providers.fabric_api import FabricClient, ITEM_TYPE_MAP
 
+logger = logging.getLogger(__name__)
 
 # Reverse map: Fabric item type -> our resource type key
 REVERSE_TYPE_MAP = {v: k for k, v in ITEM_TYPE_MAP.items()}
 
-# Additional Fabric types we recognize
+# Additional / overridden Fabric types we recognize.
+# KQLDatabase items are grouped under eventhouses; DataAgent is included.
 REVERSE_TYPE_MAP.update({
     "Lakehouse": "lakehouses",
     "Notebook": "notebooks",
@@ -28,12 +31,13 @@ REVERSE_TYPE_MAP.update({
     "Warehouse": "warehouses",
     "SemanticModel": "semantic_models",
     "Report": "reports",
+    "DataAgent": "data_agents",
     "SparkEnvironment": "environments",
     "Eventhouse": "eventhouses",
     "Eventstream": "eventstreams",
     "MLModel": "ml_models",
     "MLExperiment": "ml_experiments",
-    "KQLDatabase": "eventhouses",
+    "KQLDatabase": "kql_databases",
 })
 
 
@@ -157,24 +161,89 @@ def generate_bundle_from_workspace(
                     defn = client.get_item_definition(ws_id, item_id)
                     if defn and "definition" in defn:
                         _export_definition(defn["definition"], output_dir / "pipelines", display_name)
+                        console.print(f"    Exported: {display_name}")
                 except Exception as e:
                     console.print(f"    [yellow]Could not export {display_name}: {e}[/yellow]")
 
             elif resource_type == "semantic_models":
+                # Export TMDL definition — multi-file directory format
                 resource_def["path"] = f"./semantic_models/{display_name}/"
 
+                try:
+                    defn = client.get_item_definition(ws_id, item_id)
+                    if defn and "definition" in defn:
+                        _export_definition(
+                            defn["definition"],
+                            output_dir / "semantic_models" / display_name,
+                            display_name,
+                        )
+                        console.print(f"    Exported TMDL definition: {display_name}")
+                except Exception as e:
+                    console.print(f"    [yellow]Could not export semantic model {display_name}: {e}[/yellow]")
+
             elif resource_type == "reports":
+                # Export PBIR definition — multi-file directory format
                 resource_def["path"] = f"./reports/{display_name}/"
 
+                try:
+                    defn = client.get_item_definition(ws_id, item_id)
+                    if defn and "definition" in defn:
+                        _export_definition(
+                            defn["definition"],
+                            output_dir / "reports" / display_name,
+                            display_name,
+                        )
+                        console.print(f"    Exported PBIR definition: {display_name}")
+                except Exception as e:
+                    console.print(f"    [yellow]Could not export report {display_name}: {e}[/yellow]")
+
             elif resource_type == "lakehouses":
-                pass  # No path needed
+                pass  # No path needed — lakehouses are metadata-only
 
             elif resource_type == "warehouses":
                 resource_def["sql_scripts"] = []
+                # Attempt to list tables and views in the warehouse
+                try:
+                    schema_info = _export_warehouse_schema(client, ws_id, item_id)
+                    if schema_info:
+                        resource_def["schema"] = schema_info
+                        console.print(f"    Exported schema ({len(schema_info.get('tables', []))} tables, "
+                                      f"{len(schema_info.get('views', []))} views): {display_name}")
+                except Exception as e:
+                    console.print(f"    [yellow]Could not export warehouse schema {display_name}: {e}[/yellow]")
 
             elif resource_type == "environments":
                 resource_def["runtime"] = "1.3"
                 resource_def["libraries"] = []
+
+            elif resource_type == "eventhouses":
+                pass  # Eventhouse is metadata-only in the bundle
+
+            elif resource_type == "eventstreams":
+                pass  # Eventstream is metadata-only in the bundle
+
+            elif resource_type == "kql_databases":
+                pass  # KQL database is metadata-only in the bundle
+
+            elif resource_type == "ml_models":
+                pass  # ML model is metadata-only in the bundle
+
+            elif resource_type == "ml_experiments":
+                pass  # ML experiment is metadata-only in the bundle
+
+            elif resource_type == "data_agents":
+                pass  # Data agent is metadata-only in the bundle
+
+            else:
+                logger.warning(
+                    "No export handler for resource type %r (item: %s). "
+                    "Item will be included with metadata only.",
+                    resource_type, display_name,
+                )
+                console.print(
+                    f"    [yellow]No export handler for type '{resource_type}' — "
+                    f"including metadata only for {display_name}[/yellow]"
+                )
 
             resources[key] = resource_def
 
@@ -196,6 +265,41 @@ def generate_bundle_from_workspace(
     console.print("  4. Deploy to a target: fab bundle deploy -t dev")
 
     return bundle_data
+
+
+def _export_warehouse_schema(
+    client: FabricClient, workspace_id: str, warehouse_id: str,
+) -> dict[str, Any] | None:
+    """Query a warehouse's INFORMATION_SCHEMA to list tables and views."""
+    schema: dict[str, Any] = {"tables": [], "views": []}
+
+    # List tables
+    result = client.execute_sql(
+        workspace_id,
+        warehouse_id,
+        "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE "
+        "FROM INFORMATION_SCHEMA.TABLES ORDER BY TABLE_SCHEMA, TABLE_NAME",
+    )
+    if result:
+        rows = result.get("results", [{}])[0].get("rows", []) if result.get("results") else []
+        for row in rows:
+            # Row may be a list (positional) or dict depending on API version
+            if isinstance(row, list):
+                table_schema, table_name, table_type = row[0], row[1], row[2]
+            else:
+                table_schema = row.get("TABLE_SCHEMA", "dbo")
+                table_name = row.get("TABLE_NAME", "")
+                table_type = row.get("TABLE_TYPE", "")
+
+            entry = f"{table_schema}.{table_name}"
+            if "VIEW" in table_type.upper():
+                schema["views"].append(entry)
+            else:
+                schema["tables"].append(entry)
+
+    if not schema["tables"] and not schema["views"]:
+        return None
+    return schema
 
 
 def _export_definition(definition: dict[str, Any], output_dir: Path, name: str) -> None:

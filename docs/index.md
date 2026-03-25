@@ -24,7 +24,7 @@ Microsoft Fabric has no single declarative project definition. The Fabric CLI ca
 
 ## Features
 
-- **12 resource types** — Lakehouses, Notebooks, Pipelines, Warehouses, Semantic Models, Reports, Environments, Data Agents, Eventhouses, Eventstreams, ML Models, ML Experiments
+- **45 resource types** — Every Fabric item type: Lakehouses, Notebooks, Pipelines, Warehouses, Semantic Models, Reports, Environments, Data Agents, KQL Databases, Eventhouses, dbt Jobs, and 34 more
 - **Dependency resolution** — automatic topological sort for deployment ordering
 - **Multi-environment** — dev, staging, prod targets with variable overrides
 - **State management** — tracks deployed resources, detects drift

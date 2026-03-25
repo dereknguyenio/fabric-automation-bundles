@@ -337,20 +337,22 @@ Create your own templates by adding a directory to `fab_bundle/templates/` with 
 
 ## Supported Resource Types
 
-| Resource | Create | Update | Destroy | Notes |
-|----------|--------|--------|---------|-------|
-| Lakehouse | ✅ | ✅ | ✅ | Schema-enabled support |
-| Notebook | ✅ | ✅ | ✅ | .py, .ipynb, .sql, .scala, .r |
-| Data Pipeline | ✅ | ✅ | ✅ | Schedule + activity chaining |
-| Warehouse | ✅ | ✅ | ✅ | SQL script execution on deploy |
-| Semantic Model | ✅ | ✅ | ✅ | TMDL format |
-| Report | ✅ | ✅ | ✅ | PBIR format (requires PBI Desktop export) |
-| Environment | ✅ | ✅ | ✅ | Runtime, PyPI libraries, Spark config |
-| Data Agent | ✅ | ✅ | ✅ | Instructions + few-shot examples |
-| Eventhouse | ✅ | ✅ | ✅ | KQL scripts |
-| Eventstream | ✅ | ✅ | ✅ | |
-| ML Model | ✅ | ✅ | ✅ | |
-| ML Experiment | ✅ | ✅ | ✅ | |
+**45 item types** across all Fabric workloads:
+
+| Category | Types |
+|----------|-------|
+| Data Engineering | Lakehouse, Notebook, Environment, SparkJobDefinition, GraphQLApi, SnowflakeDatabase |
+| Data Factory | DataPipeline, CopyJob, MountedDataFactory, ApacheAirflowJob, dbt Job |
+| Data Warehouse | Warehouse, SQLDatabase, MirroredDatabase, MirroredWarehouse, MirroredDatabricksCatalog, CosmosDB, Datamart |
+| Power BI | SemanticModel, Report, PaginatedReport, Dashboard, Dataflow |
+| Data Science | MLModel, MLExperiment |
+| Real-Time Intelligence | Eventhouse, Eventstream, KQLDatabase, KQLDashboard, KQLQueryset, Reflex, DigitalTwinBuilder, DigitalTwinBuilderFlow, EventSchemaSet, GraphQuerySet |
+| AI & Knowledge | DataAgent, OperationsAgent, AnomalyDetector, Ontology |
+| Other | VariableLibrary, UserDataFunction, Graph, GraphModel, Map, HLSCohort |
+
+Plus **OneLake Shortcuts** (ADLS, S3, cross-workspace) as lakehouse sub-resources.
+
+See the [Resource Types Guide](https://dereknguyenio.github.io/fabric-automation-bundles/guide/resource-types/) for full details.
 
 ## Authentication
 

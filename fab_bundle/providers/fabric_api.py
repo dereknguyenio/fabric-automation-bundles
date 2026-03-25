@@ -53,6 +53,23 @@ ITEM_TYPE_MAP = {
     "variable_libraries": "VariableLibrary",
     "ontologies": "Ontology",
     "graphs": "Graph",
+    "dbt_jobs": "DataBuildToolJob",
+    "datamarts": "Datamart",
+    "paginated_reports": "PaginatedReport",
+    "dashboards": "Dashboard",
+    "mirrored_warehouses": "MirroredWarehouse",
+    "snowflake_databases": "SnowflakeDatabase",
+    "cosmosdb_databases": "CosmosDBDatabase",
+    "mirrored_databricks_catalogs": "MirroredAzureDatabricksCatalog",
+    "operations_agents": "OperationsAgent",
+    "anomaly_detectors": "AnomalyDetector",
+    "digital_twin_builders": "DigitalTwinBuilder",
+    "digital_twin_builder_flows": "DigitalTwinBuilderFlow",
+    "event_schema_sets": "EventSchemaSet",
+    "graph_query_sets": "GraphQuerySet",
+    "map_items": "Map",
+    "graph_models": "GraphModel",
+    "hls_cohorts": "HLSCohort",
 }
 
 

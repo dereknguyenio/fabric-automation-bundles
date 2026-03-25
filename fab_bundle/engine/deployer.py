@@ -686,42 +686,74 @@ class Deployer:
 
     def _deploy_shortcuts(self, workspace_id: str) -> None:
         """Deploy OneLake shortcuts for lakehouses."""
-        for key, lakehouse in self.bundle.resources.lakehouses.items():
+        for lh_key, lakehouse in self.bundle.resources.lakehouses.items():
             if not lakehouse.shortcuts:
                 continue
 
-            # Find the lakehouse item ID
-            try:
-                items = self.client.get_workspace_items_map(workspace_id)
-                lh_info = items.get(key)
-                if not lh_info:
-                    continue
-                lh_id = lh_info["id"]
-            except Exception:
+            items = self.client.get_workspace_items_map(workspace_id)
+            lh_info = items.get(lh_key)
+            if not lh_info:
                 continue
 
+            existing_shortcuts = []
+            try:
+                existing_shortcuts = self.client.list_shortcuts(workspace_id, lh_info["id"])
+            except Exception:
+                pass
+            existing_names = {s.get("name") for s in existing_shortcuts}
+
             for shortcut in lakehouse.shortcuts:
-                if self.dry_run:
-                    self.console.print(f"  [dim]Would create shortcut: {shortcut.name} in {key}[/dim]")
+                name = shortcut.name
+                if name in existing_names:
                     continue
 
                 try:
-                    # Parse target URI to determine shortcut type
-                    target_config = {"type": "ExternalTarget"}
-                    if shortcut.target.startswith("adls://"):
-                        parts = shortcut.target.replace("adls://", "").split("/", 2)
+                    # Parse target — supports ADLS, S3, OneLake, GCS
+                    target_str = shortcut.target or ""
+                    target_config: dict[str, Any] = {}
+
+                    if target_str.startswith("adls://") or target_str.startswith("abfss://"):
+                        parts = target_str.replace("adls://", "").replace("abfss://", "").split("/", 2)
                         target_config = {
                             "adlsGen2": {
                                 "location": f"https://{parts[0]}.dfs.core.windows.net",
                                 "subpath": f"/{'/'.join(parts[1:])}" if len(parts) > 1 else "/",
                             }
                         }
+                        if shortcut.connection_id:
+                            target_config["adlsGen2"]["connectionId"] = shortcut.connection_id
+                    elif target_str.startswith("s3://"):
+                        parts = target_str.replace("s3://", "").split("/", 1)
+                        target_config = {
+                            "amazonS3": {
+                                "location": f"https://{parts[0]}.s3.amazonaws.com",
+                                "subpath": f"/{parts[1]}" if len(parts) > 1 else "/",
+                            }
+                        }
+                    elif target_str.startswith("onelake://"):
+                        parts = target_str.replace("onelake://", "").split("/", 2)
+                        target_config = {
+                            "oneLake": {
+                                "workspaceId": parts[0] if len(parts) > 0 else "",
+                                "itemId": parts[1] if len(parts) > 1 else "",
+                                "path": f"/{parts[2]}" if len(parts) > 2 else "/",
+                            }
+                        }
+                    else:
+                        # Treat as generic path
+                        target_config = {"adlsGen2": {"location": target_str, "subpath": "/"}}
 
-                    path = shortcut.subfolder or "/Tables"
-                    self.client.create_shortcut(workspace_id, lh_id, shortcut.name, path, target_config)
-                    self.console.print(f"    Created shortcut: {shortcut.name} in {key}")
+                    shortcut_path = shortcut.path or "Tables"
+
+                    if self.dry_run:
+                        self.console.print(f"  [dim]Would create shortcut: {name} in {lh_key}[/dim]")
+                    else:
+                        self.client.create_shortcut(
+                            workspace_id, lh_info["id"], name, shortcut_path, target_config,
+                        )
+                        self.console.print(f"    Shortcut: {name} → {target_str}")
                 except Exception as e:
-                    self.console.print(f"    [yellow]Warning:[/yellow] Shortcut '{shortcut.name}' failed: {e}")
+                    self.console.print(f"    [yellow]Warning:[/yellow] Shortcut {name} on {lh_key}: {e}")
 
     def _run_post_deploy_validation(self, workspace_id: str, target_name: str | None) -> list[str]:
         """Run post-deploy validation checks. Returns list of failures."""

@@ -117,6 +117,42 @@ def build_dependency_graph(resources: ResourcesConfig) -> dict[str, ResourceNode
         if mdb.connection and mdb.connection in nodes:
             nodes[key].depends_on.add(mdb.connection)
 
+    # dbt jobs depend on environment
+    for key, res in resources.dbt_jobs.items():
+        if res.environment and res.environment in nodes:
+            nodes[key].depends_on.add(res.environment)
+
+    # Digital twin flows depend on twin builder
+    for key, res in resources.digital_twin_builder_flows.items():
+        if res.twin_builder and res.twin_builder in nodes:
+            nodes[key].depends_on.add(res.twin_builder)
+
+    # Snowflake/CosmosDB/Databricks depend on connection
+    for key, res in resources.snowflake_databases.items():
+        if res.connection and res.connection in nodes:
+            nodes[key].depends_on.add(res.connection)
+    for key, res in resources.cosmosdb_databases.items():
+        if res.connection and res.connection in nodes:
+            nodes[key].depends_on.add(res.connection)
+    for key, res in resources.mirrored_databricks_catalogs.items():
+        if res.connection and res.connection in nodes:
+            nodes[key].depends_on.add(res.connection)
+
+    # Graph query sets depend on data source
+    for key, res in resources.graph_query_sets.items():
+        if res.data_source and res.data_source in nodes:
+            nodes[key].depends_on.add(res.data_source)
+
+    # Graph models depend on data source
+    for key, res in resources.graph_models.items():
+        if res.data_source and res.data_source in nodes:
+            nodes[key].depends_on.add(res.data_source)
+
+    # Paginated reports depend on data source
+    for key, res in resources.paginated_reports.items():
+        if res.data_source and res.data_source in nodes:
+            nodes[key].depends_on.add(res.data_source)
+
     return nodes
 
 

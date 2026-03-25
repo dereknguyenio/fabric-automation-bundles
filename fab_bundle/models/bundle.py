@@ -109,8 +109,9 @@ class GitIntegrationConfig(BaseModel):
 class ShortcutConfig(BaseModel):
     """OneLake shortcut definition."""
     name: str
-    target: str = Field(..., description="Target path (e.g., adls://account/container/path)")
-    subfolder: str | None = None
+    target: str = Field(..., description="Target path (adls://, s3://, onelake://)")
+    path: str = Field("Tables", description="Shortcut location in lakehouse (Tables or Files)")
+    connection_id: str | None = Field(None, description="Connection ID for authenticated shortcuts")
 
 
 class TableSchema(BaseModel):
@@ -352,6 +353,114 @@ class GraphResource(BaseModel):
     data_source: str | None = Field(None, description="Lakehouse or SQL database resource key")
 
 
+class DataBuildToolJobResource(BaseModel):
+    """dbt job resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to dbt project or job definition")
+    environment: str | None = Field(None, description="Environment resource key")
+
+
+class DatamartResource(BaseModel):
+    """Datamart resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to datamart definition")
+
+
+class PaginatedReportResource(BaseModel):
+    """Paginated Report (RDL) resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to .rdl report definition")
+    data_source: str | None = Field(None, description="Data source resource key")
+
+
+class DashboardResource(BaseModel):
+    """Power BI Dashboard resource definition."""
+    description: str | None = None
+
+
+class MirroredWarehouseResource(BaseModel):
+    """Mirrored Warehouse resource definition."""
+    description: str | None = None
+    source_type: str | None = None
+
+
+class SnowflakeDatabaseResource(BaseModel):
+    """Snowflake Database resource definition."""
+    description: str | None = None
+    connection: str | None = Field(None, description="Connection resource key")
+
+
+class CosmosDBDatabaseResource(BaseModel):
+    """Cosmos DB Database resource definition."""
+    description: str | None = None
+    connection: str | None = Field(None, description="Connection resource key")
+
+
+class MirroredDatabricksCatalogResource(BaseModel):
+    """Mirrored Azure Databricks Catalog resource definition."""
+    description: str | None = None
+    connection: str | None = Field(None, description="Connection resource key")
+
+
+class OperationsAgentResource(BaseModel):
+    """Operations Agent resource definition."""
+    description: str | None = None
+    sources: list[str] = Field(default_factory=list, description="Data source resource keys")
+    instructions: str | None = Field(None, description="Path to instructions file")
+
+
+class AnomalyDetectorResource(BaseModel):
+    """Anomaly Detector resource definition."""
+    description: str | None = None
+    data_source: str | None = Field(None, description="Data source resource key")
+    path: str | None = Field(None, description="Path to detector configuration")
+
+
+class DigitalTwinBuilderResource(BaseModel):
+    """Digital Twin Builder resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to twin definition")
+
+
+class DigitalTwinBuilderFlowResource(BaseModel):
+    """Digital Twin Builder Flow resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to flow definition")
+    twin_builder: str | None = Field(None, description="Digital twin builder resource key")
+
+
+class EventSchemaSetResource(BaseModel):
+    """Event Schema Set resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to schema set definition")
+
+
+class GraphQuerySetResource(BaseModel):
+    """Graph Query Set resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to query set definition")
+    data_source: str | None = Field(None, description="Graph or KQL database resource key")
+
+
+class MapResource(BaseModel):
+    """Map resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to map definition")
+
+
+class GraphModelResource(BaseModel):
+    """Graph Model resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to graph model definition")
+    data_source: str | None = Field(None, description="Data source resource key")
+
+
+class HLSCohortResource(BaseModel):
+    """HLS Cohort (Healthcare) resource definition."""
+    description: str | None = None
+    path: str | None = Field(None, description="Path to cohort definition")
+
+
 # ---------------------------------------------------------------------------
 # Sub-models: Security
 # ---------------------------------------------------------------------------
@@ -483,6 +592,23 @@ class ResourcesConfig(BaseModel):
     variable_libraries: dict[str, VariableLibraryResource] = Field(default_factory=dict)
     ontologies: dict[str, OntologyResource] = Field(default_factory=dict)
     graphs: dict[str, GraphResource] = Field(default_factory=dict)
+    dbt_jobs: dict[str, DataBuildToolJobResource] = Field(default_factory=dict)
+    datamarts: dict[str, DatamartResource] = Field(default_factory=dict)
+    paginated_reports: dict[str, PaginatedReportResource] = Field(default_factory=dict)
+    dashboards: dict[str, DashboardResource] = Field(default_factory=dict)
+    mirrored_warehouses: dict[str, MirroredWarehouseResource] = Field(default_factory=dict)
+    snowflake_databases: dict[str, SnowflakeDatabaseResource] = Field(default_factory=dict)
+    cosmosdb_databases: dict[str, CosmosDBDatabaseResource] = Field(default_factory=dict)
+    mirrored_databricks_catalogs: dict[str, MirroredDatabricksCatalogResource] = Field(default_factory=dict)
+    operations_agents: dict[str, OperationsAgentResource] = Field(default_factory=dict)
+    anomaly_detectors: dict[str, AnomalyDetectorResource] = Field(default_factory=dict)
+    digital_twin_builders: dict[str, DigitalTwinBuilderResource] = Field(default_factory=dict)
+    digital_twin_builder_flows: dict[str, DigitalTwinBuilderFlowResource] = Field(default_factory=dict)
+    event_schema_sets: dict[str, EventSchemaSetResource] = Field(default_factory=dict)
+    graph_query_sets: dict[str, GraphQuerySetResource] = Field(default_factory=dict)
+    map_items: dict[str, MapResource] = Field(default_factory=dict)
+    graph_models: dict[str, GraphModelResource] = Field(default_factory=dict)
+    hls_cohorts: dict[str, HLSCohortResource] = Field(default_factory=dict)
 
     def all_resource_keys(self) -> set[str]:
         """Return all resource keys across all types."""

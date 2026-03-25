@@ -1,6 +1,6 @@
 # Fabric Automation Bundles
 
-**Declarative project definitions for Microsoft Fabric — inspired by [Databricks Declarative Automation Bundles](https://docs.databricks.com/en/dev-tools/bundles/).**
+**Declarative project definitions for Microsoft Fabric.**
 
 Define your entire Fabric project in a single `fabric.yml` — lakehouses, notebooks, pipelines, semantic models, Data Agents, security roles, and environment targets — then validate, plan, and deploy with a single command.
 
@@ -15,9 +15,7 @@ fab-bundle deploy -t prod
 
 ## The Problem
 
-Databricks has [Declarative Automation Bundles](https://docs.databricks.com/en/dev-tools/bundles/) — a single YAML file that defines your entire project and deploys it consistently across dev, staging, and prod.
-
-Microsoft Fabric has **nothing equivalent**. The Fabric CLI can export/import items, `fabric-cicd` can deploy across workspaces, and Terraform can provision infrastructure — but there is no single declarative project definition that describes:
+Microsoft Fabric has no single declarative project definition. The Fabric CLI can export/import items, `fabric-cicd` can deploy across workspaces, and Terraform can provision infrastructure — but none of them describe:
 
 - What resources your project needs (lakehouses, notebooks, pipelines, semantic models, Data Agents)
 - How those resources depend on each other
@@ -108,7 +106,7 @@ bundle:
   version: "1.0.0"
 
 workspace:
-  capacity: F64
+  capacity_id: "your-fabric-capacity-guid"
 
 resources:
   environments:
@@ -166,7 +164,7 @@ targets:
     default: true
     workspace:
       name: my-analytics-dev
-      capacity: F2
+      capacity_id: "your-dev-capacity-guid"
 
   prod:
     workspace:
@@ -249,6 +247,7 @@ Copy `cicd/azure-devops.yml` to your repo as a YAML pipeline — includes valida
 | `fab-bundle run <resource>` | Run a notebook or pipeline |
 | `fab-bundle list` | List available templates |
 | `fab-bundle bind` | Bind an existing workspace item |
+| `fab-bundle drift` | Detect drift between deployed state and live workspace |
 
 ### Common Flags
 
@@ -283,30 +282,22 @@ OSDU on Fabric for Oil, Gas & Energy:
 
 Create your own templates by adding a directory to `fab_bundle/templates/` with a `template.yml` and a `fabric.yml`.
 
-## Comparison: Databricks vs Fabric Automation Bundles
+## Supported Resource Types
 
-| Feature | Databricks (DABs) | Fabric Automation Bundles |
-|---------|-------------------|--------------------------|
-| Project definition | `databricks.yml` | `fabric.yml` |
-| CLI (standalone) | `databricks bundle` | `fab-bundle` |
-| CLI (integrated) | `databricks bundle` | `fab bundle` (planned) |
-| Validate | `databricks bundle validate` | `fab-bundle validate` |
-| Deploy | `databricks bundle deploy` | `fab-bundle deploy` |
-| Dry-run / Plan | `databricks bundle deploy` | `fab-bundle plan` |
-| Run a resource | `databricks bundle run` | `fab-bundle run` |
-| Generate from existing | `databricks bundle generate` | `fab-bundle generate` |
-| Init from template | `databricks bundle init` | `fab-bundle init` |
-| Targets/Environments | ✅ YAML targets | ✅ YAML targets |
-| Dependency ordering | ✅ Automatic | ✅ Automatic (topological sort) |
-| Variable substitution | ✅ `${var.name}` | ✅ `${var.name}` |
-| Include files | ✅ | ✅ |
-| Service principal auth | ✅ | ✅ |
-| GitHub Actions | ✅ | ✅ (template provided) |
-| Azure DevOps | ✅ | ✅ (template provided) |
-| Workspace security | Via Unity Catalog | ✅ Entra + OneLake roles |
-| Data Agents | N/A | ✅ First-class resource |
-| Semantic Models | N/A | ✅ First-class resource |
-| Custom templates | ✅ | ✅ |
+| Resource | Create | Update | Destroy | Notes |
+|----------|--------|--------|---------|-------|
+| Lakehouse | ✅ | ✅ | ✅ | Schema-enabled support |
+| Notebook | ✅ | ✅ | ✅ | .py, .ipynb, .sql, .scala, .r |
+| Data Pipeline | ✅ | ✅ | ✅ | Schedule + activity chaining |
+| Warehouse | ✅ | ✅ | ✅ | SQL script execution on deploy |
+| Semantic Model | ✅ | ✅ | ✅ | TMDL format |
+| Report | ✅ | ✅ | ✅ | PBIR format (requires PBI Desktop export) |
+| Environment | ✅ | ✅ | ✅ | Runtime, PyPI libraries, Spark config |
+| Data Agent | ✅ | ✅ | ✅ | Instructions + few-shot examples |
+| Eventhouse | ✅ | ✅ | ✅ | KQL scripts |
+| Eventstream | ✅ | ✅ | ✅ | |
+| ML Model | ✅ | ✅ | ✅ | |
+| ML Experiment | ✅ | ✅ | ✅ | |
 
 ## Authentication
 
@@ -328,16 +319,18 @@ fab-bundle deploy -t prod -y
 
 ```
 fab_bundle/
-├── cli.py                 # Click CLI (init, validate, plan, deploy, destroy, generate, run)
+├── cli.py                 # Click CLI (init, validate, plan, deploy, destroy, generate, run, drift)
 ├── models/
 │   └── bundle.py          # 30+ Pydantic models for fabric.yml schema
 ├── engine/
 │   ├── loader.py          # YAML parser with includes + variable substitution
 │   ├── resolver.py        # Topological dependency sort
 │   ├── planner.py         # Diff engine (desired state vs workspace state)
-│   └── deployer.py        # Executes plans via Fabric REST API
+│   ├── deployer.py        # Executes plans via Fabric REST API
+│   ├── state.py           # Deployment state tracking + drift detection
+│   └── secrets.py         # Secrets resolution (env vars + Azure KeyVault)
 ├── providers/
-│   └── fabric_api.py      # Fabric REST API client with retry logic
+│   └── fabric_api.py      # Fabric REST API client (workspace, items, git, connections, jobs)
 ├── generators/
 │   ├── reverse.py         # Generate fabric.yml from existing workspace
 │   └── templates.py       # Template engine with Jinja2
@@ -351,7 +344,7 @@ fab_bundle/
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ```bash
-git clone https://github.com/microsoft/fabric-automation-bundles.git
+git clone https://github.com/dereknguyenio/fabric-automation-bundles.git
 cd fabric-automation-bundles
 pip install -e ".[dev]"
 pytest

@@ -235,17 +235,45 @@ class FabricClient:
         item_type: str,
         definition: dict[str, Any] | None = None,
         description: str | None = None,
+        creation_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Create a new item in a workspace."""
-        body: dict[str, Any] = {
-            "displayName": display_name,
-            "type": item_type,
+        """Create a new item in a workspace.
+
+        Uses type-specific endpoints where required (e.g. /lakehouses, /notebooks).
+        Falls back to the generic /items endpoint otherwise.
+        """
+        # Type-specific endpoints required by certain item types
+        TYPE_ENDPOINTS = {
+            "Lakehouse": "lakehouses",
+            "Notebook": "notebooks",
+            "Warehouse": "warehouses",
+            "SemanticModel": "semanticModels",
+            "Report": "reports",
+            "DataPipeline": "dataPipelines",
+            "SparkEnvironment": "environments",
+            "Eventhouse": "eventhouses",
+            "Eventstream": "eventstreams",
+            "MLModel": "mlModels",
+            "MLExperiment": "mlExperiments",
+            "DataAgent": "dataAgents",
         }
+
+        body: dict[str, Any] = {"displayName": display_name}
         if description:
             body["description"] = description
         if definition:
             body["definition"] = definition
-        return self._request("POST", f"/workspaces/{workspace_id}/items", data=body) or {}
+        if creation_payload:
+            body["creationPayload"] = creation_payload
+
+        endpoint = TYPE_ENDPOINTS.get(item_type)
+        if endpoint:
+            path = f"/workspaces/{workspace_id}/{endpoint}"
+        else:
+            body["type"] = item_type
+            path = f"/workspaces/{workspace_id}/items"
+
+        return self._request("POST", path, data=body) or {}
 
     def update_item(
         self,

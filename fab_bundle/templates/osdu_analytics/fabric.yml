@@ -4,7 +4,8 @@ bundle:
   description: "OSDU + Fabric analytics platform for upstream O&G — wells, wellbores, and production data"
 
 workspace:
-  capacity: ${{capacity_sku}}
+  # Your Fabric capacity GUID — find it in the Fabric Admin Portal → Capacities
+  capacity_id: ${{capacity_id}}
 
 variables:
   adme_endpoint:
@@ -191,7 +192,7 @@ targets:
     default: true
     workspace:
       name: ${{project_name}}-dev
-      capacity: F2
+      # capacity_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # override per target
     variables:
       adme_endpoint: "https://myorg-dev.energy.azure.com"
       adls_account: "myorgadmedev"
@@ -199,7 +200,7 @@ targets:
   staging:
     workspace:
       name: ${{project_name}}-staging
-      capacity: F16
+      # capacity_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # override per target
     variables:
       adme_endpoint: "https://myorg-staging.energy.azure.com"
       adls_account: "myorgadmestaging"

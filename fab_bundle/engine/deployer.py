@@ -222,8 +222,9 @@ class Deployer:
         workspace_id = result["id"]
 
         # Assign capacity if specified
-        if ws_config.capacity:
-            self.client.assign_capacity(workspace_id, ws_config.capacity)
+        cap_id = ws_config.effective_capacity_id
+        if cap_id:
+            self.client.assign_capacity(workspace_id, cap_id)
 
         return workspace_id
 

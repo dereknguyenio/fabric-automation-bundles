@@ -6,6 +6,6 @@ variables:
   project_name:
     description: "Name of the project"
     default: "my-fabric-project"
-  capacity_sku:
-    description: "Fabric capacity SKU"
-    default: "F64"
+  capacity_id:
+    description: "Fabric capacity GUID (from Admin Portal → Capacities)"
+    default: ""

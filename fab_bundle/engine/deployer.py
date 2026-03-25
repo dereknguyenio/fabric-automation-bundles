@@ -18,7 +18,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from fab_bundle.engine.planner import DeploymentPlan, PlanAction, PlanItem
 from fab_bundle.models.bundle import BundleDefinition
-from fab_bundle.providers.fabric_api import FabricApiError, FabricClient, ITEM_TYPE_MAP
+from fab_bundle.providers.fabric_api import FabricApiError, FabricClient, ITEM_TYPE_MAP, LIST_ONLY_TYPES, DEFINITION_REQUIRED_TYPES, NO_DEFINITION_TYPES
 from fab_bundle.engine.state import StateManager, compute_definition_hash
 
 
@@ -164,6 +164,68 @@ class Deployer:
                         "payload": ipynb_b64,
                         "payloadType": "InlineBase64",
                     }
+                ],
+            }
+
+    def _build_spark_job_definition(self, resource_key: str) -> dict[str, Any] | None:
+        """Build Fabric item definition for a Spark Job Definition."""
+        sjd = self.bundle.resources.spark_job_definitions.get(resource_key)
+        if not sjd or not sjd.path:
+            return None
+
+        file_ext = Path(sjd.path).suffix.lower()
+
+        if file_ext == ".jar":
+            content_b64 = self._read_file_as_base64(sjd.path)
+            return {
+                "parts": [
+                    {
+                        "path": "SparkJobDefinitionV1.json",
+                        "payload": base64.b64encode(json.dumps({
+                            "executableFile": None,
+                            "defaultLakehouseArtifactId": "",
+                            "mainClass": "",
+                            "additionalLakehouseIds": [],
+                            "retryPolicy": None,
+                            "commandLineArguments": " ".join(sjd.args) if sjd.args else "",
+                            "additionalLibraryUris": [],
+                            "language": "Java",
+                            "environmentArtifactId": None,
+                        }).encode()).decode(),
+                        "payloadType": "InlineBase64",
+                    },
+                    {
+                        "path": Path(sjd.path).name,
+                        "payload": content_b64,
+                        "payloadType": "InlineBase64",
+                    },
+                ],
+            }
+        else:
+            # .py files — wrap as SparkJobDefinition
+            content_b64 = self._read_file_as_base64(sjd.path)
+            return {
+                "parts": [
+                    {
+                        "path": "SparkJobDefinitionV1.json",
+                        "payload": base64.b64encode(json.dumps({
+                            "executableFile": None,
+                            "defaultLakehouseArtifactId": "",
+                            "mainClass": "",
+                            "additionalLakehouseIds": [],
+                            "retryPolicy": None,
+                            "commandLineArguments": " ".join(sjd.args) if sjd.args else "",
+                            "additionalLibraryUris": [],
+                            "language": "Python",
+                            "environmentArtifactId": None,
+                        }).encode()).decode(),
+                        "payloadType": "InlineBase64",
+                    },
+                    {
+                        "path": Path(sjd.path).name,
+                        "payload": content_b64,
+                        "payloadType": "InlineBase64",
+                    },
                 ],
             }
 
@@ -345,34 +407,43 @@ class Deployer:
         if builder:
             return builder(resource_key)
 
-        if resource_type == "Dataflow":
-            df = self.bundle.resources.dataflows.get(resource_key)
-            if df and df.path:
-                return self._build_generic_definition(df.path, "dataflow.json")
-        elif resource_type == "SparkJobDefinition":
+        # Type-specific definition part paths used by the Fabric API
+        DEFINITION_PART_MAP = {
+            "Dataflow": ("dataflows", "dataflow.json"),
+            "GraphQLApi": ("graphql_apis", "schema.graphql"),
+            "CopyJob": ("copy_jobs", "copyjob.json"),
+            "ApacheAirflowJob": ("airflow_jobs", "dag.py"),
+            "Reflex": ("reflex", "reflex.json"),
+            "UserDataFunction": ("user_data_functions", "function.json"),
+            "Eventstream": ("eventstreams", "eventstream.json"),
+            "KQLDashboard": ("kql_dashboards", "definition.json"),
+            "KQLQueryset": ("kql_querysets", "definition.json"),
+            "Ontology": ("ontologies", "definition.json"),
+            "Graph": ("graphs", "definition.json"),
+            "DataBuildToolJob": ("dbt_jobs", "dbt-project.json"),
+            "AnomalyDetector": ("anomaly_detectors", "definition.json"),
+            "DigitalTwinBuilder": ("digital_twin_builders", "definition.json"),
+            "DigitalTwinBuilderFlow": ("digital_twin_builder_flows", "definition.json"),
+            "EventSchemaSet": ("event_schema_sets", "definition.json"),
+            "GraphQuerySet": ("graph_query_sets", "definition.json"),
+            "Map": ("map_items", "definition.json"),
+            "GraphModel": ("graph_models", "definition.json"),
+            "HLSCohort": ("hls_cohorts", "definition.json"),
+        }
+
+        if resource_type == "SparkJobDefinition":
             sjd = self.bundle.resources.spark_job_definitions.get(resource_key)
             if sjd and sjd.path:
-                return self._build_notebook_definition(resource_key)
-        elif resource_type == "GraphQLApi":
-            gql = self.bundle.resources.graphql_apis.get(resource_key)
-            if gql and gql.path:
-                return self._build_generic_definition(gql.path, "schema.graphql")
-        elif resource_type == "CopyJob":
-            cj = self.bundle.resources.copy_jobs.get(resource_key)
-            if cj and cj.path:
-                return self._build_generic_definition(cj.path, "copyjob.json")
-        elif resource_type == "ApacheAirflowJob":
-            aj = self.bundle.resources.airflow_jobs.get(resource_key)
-            if aj and aj.path:
-                return self._build_generic_definition(aj.path, "dag.py")
-        elif resource_type == "Reflex":
-            rx = self.bundle.resources.reflex.get(resource_key)
-            if rx and rx.path:
-                return self._build_generic_definition(rx.path, "reflex.json")
-        elif resource_type == "UserDataFunction":
-            udf = self.bundle.resources.user_data_functions.get(resource_key)
-            if udf and udf.path:
-                return self._build_generic_definition(udf.path, "function.json")
+                return self._build_spark_job_definition(resource_key)
+            return None
+
+        if resource_type in DEFINITION_PART_MAP:
+            field_name, part_name = DEFINITION_PART_MAP[resource_type]
+            resource_dict = getattr(self.bundle.resources, field_name, {})
+            resource = resource_dict.get(resource_key)
+            if resource and hasattr(resource, "path") and resource.path:
+                return self._build_generic_definition(resource.path, part_name)
+            return None
 
         return None
 
@@ -860,10 +931,25 @@ class Deployer:
     ) -> bool:
         """Deploy a single item. Returns True on success."""
         resource_type_name = self.bundle.resources.get_resource_type(item.resource_key)
+        fabric_type = item.resource_type
+
+        # Skip list-only types that cannot be created/updated/deleted via API
+        if fabric_type in LIST_ONLY_TYPES:
+            self.console.print(f"  [dim]-[/dim] {item.resource_key}: {fabric_type} is list-only (cannot be managed via API)")
+            return True
 
         if item.action == PlanAction.CREATE:
             definition = self._get_item_definition(item.resource_key, item.resource_type)
             description = self._get_description(item.resource_key, resource_type_name) if resource_type_name else None
+
+            # Don't send definition for types that don't support it
+            if fabric_type in NO_DEFINITION_TYPES:
+                definition = None
+
+            # Warn if definition required but missing
+            if fabric_type in DEFINITION_REQUIRED_TYPES and not definition:
+                self.console.print(f"  [yellow]Warning:[/yellow] {item.resource_key}: {fabric_type} requires a definition — skipping")
+                return True
 
             if self.dry_run:
                 self.console.print(f"  [green]+[/green] Would create {item.resource_type}: {item.resource_key}")
@@ -931,6 +1017,10 @@ class Deployer:
                 return False
 
             definition = self._get_item_definition(item.resource_key, item.resource_type)
+
+            # Don't update definition for types that don't support it
+            if fabric_type in NO_DEFINITION_TYPES:
+                definition = None
 
             # Skip if definition unchanged (incremental deploy)
             if definition and self.state_manager and not getattr(self, '_force_deploy', False):

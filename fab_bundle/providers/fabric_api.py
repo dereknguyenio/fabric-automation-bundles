@@ -72,6 +72,21 @@ ITEM_TYPE_MAP = {
     "hls_cohorts": "HLSCohort",
 }
 
+# Item types that are list-only — cannot be created/deleted via API
+LIST_ONLY_TYPES = {
+    "Datamart", "MirroredWarehouse", "SQLEndpoint", "Dashboard", "PaginatedReport",
+}
+
+# Item types that REQUIRE a definition to create (cannot create empty)
+DEFINITION_REQUIRED_TYPES = {
+    "MountedDataFactory", "MirroredDatabase", "Report", "SemanticModel",
+}
+
+# Item types where definition upload is not supported
+NO_DEFINITION_TYPES = {
+    "MLModel", "MLExperiment", "Warehouse",
+}
+
 
 @dataclass
 class FabricAuth:
@@ -303,6 +318,35 @@ class FabricClient:
             "MLModel": "mlModels",
             "MLExperiment": "mlExperiments",
             "DataAgent": "dataAgents",
+            "KQLDatabase": "kqlDatabases",
+            "KQLDashboard": "kqlDashboards",
+            "KQLQueryset": "kqlQuerysets",
+            "SparkJobDefinition": "sparkJobDefinitions",
+            "GraphQLApi": "graphqlApis",
+            "Reflex": "reflexes",
+            "CopyJob": "copyJobs",
+            "MountedDataFactory": "mountedDataFactories",
+            "SnowflakeDatabase": "snowflakeDatabases",
+            "DataBuildToolJob": "dataBuildToolJobs",
+            "Ontology": "ontologies",
+            "MirroredDatabase": "mirroredDatabases",
+            "MirroredAzureDatabricksCatalog": "mirroredAzureDatabricksCatalogs",
+            "DigitalTwinBuilder": "digitalTwinBuilders",
+            "DigitalTwinBuilderFlow": "digitalTwinBuilderFlows",
+            "GraphQuerySet": "graphQuerySets",
+            "HLSCohort": "hlsCohorts",
+            "Dataflow": "dataflows",
+            "VariableLibrary": "variableLibraries",
+            "UserDataFunction": "userDataFunctions",
+            "ApacheAirflowJob": "apacheAirflowJobs",
+            "SQLDatabase": "sqlDatabases",
+            "CosmosDBDatabase": "cosmosDBDatabases",
+            "OperationsAgent": "operationsAgents",
+            "AnomalyDetector": "anomalyDetectors",
+            "EventSchemaSet": "eventSchemaSets",
+            "Map": "maps",
+            "GraphModel": "graphModels",
+            "Graph": "graphs",
         }
 
         body: dict[str, Any] = {"displayName": display_name}

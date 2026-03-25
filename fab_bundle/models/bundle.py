@@ -609,6 +609,8 @@ class ResourcesConfig(BaseModel):
     ontologies: dict[str, OntologyResource] = Field(default_factory=dict)
     graphs: dict[str, GraphResource] = Field(default_factory=dict)
     dbt_jobs: dict[str, DataBuildToolJobResource] = Field(default_factory=dict)
+    # Note: These types are list-only in the Fabric API — they can be listed
+    # but not created/updated/deleted programmatically
     datamarts: dict[str, DatamartResource] = Field(default_factory=dict)
     paginated_reports: dict[str, PaginatedReportResource] = Field(default_factory=dict)
     dashboards: dict[str, DashboardResource] = Field(default_factory=dict)

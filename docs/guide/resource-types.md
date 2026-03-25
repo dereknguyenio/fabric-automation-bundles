@@ -27,19 +27,19 @@
 | Warehouse | `warehouses` | Warehouse | SQL scripts |
 | SQL Database | `sql_databases` | SQLDatabase | SQL scripts |
 | Mirrored Database | `mirrored_databases` | MirroredDatabase | Connection-based |
-| Mirrored Warehouse | `mirrored_warehouses` | MirroredWarehouse | Metadata |
+| Mirrored Warehouse | `mirrored_warehouses` | MirroredWarehouse | List-only — cannot be created via API |
 | Mirrored Databricks Catalog | `mirrored_databricks_catalogs` | MirroredAzureDatabricksCatalog | Connection-based |
 | Cosmos DB Database | `cosmosdb_databases` | CosmosDBDatabase | Connection-based |
-| Datamart | `datamarts` | Datamart | Definition file |
+| Datamart | `datamarts` | Datamart | List-only — cannot be created via API |
 
 ### Power BI
 | Resource | Type Key | API Type | Definitions |
 |----------|----------|----------|-------------|
 | Semantic Model | `semantic_models` | SemanticModel | TMDL or TMSL |
 | Report | `reports` | Report | PBIR format |
-| Paginated Report | `paginated_reports` | PaginatedReport | .rdl file |
-| Dashboard | `dashboards` | Dashboard | Metadata |
-| Dataflow | `dataflows` | Dataflow | JSON definition |
+| Paginated Report | `paginated_reports` | PaginatedReport | List-only — cannot be created via API |
+| Dashboard | `dashboards` | Dashboard | List-only — cannot be created via API |
+| Dataflow | `dataflows` | Dataflow | Not supported by Fabric API |
 
 ### Data Science
 | Resource | Type Key | API Type | Definitions |

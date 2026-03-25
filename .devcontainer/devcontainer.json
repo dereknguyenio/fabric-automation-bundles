@@ -1,0 +1,24 @@
+{
+    "name": "Fabric Automation Bundles",
+    "image": "mcr.microsoft.com/devcontainers/python:3.12",
+    "features": {
+        "ghcr.io/devcontainers/features/azure-cli:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "postCreateCommand": "pip install -e '.[dev]'",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "redhat.vscode-yaml",
+                "ms-python.python",
+                "ms-python.vscode-pylance"
+            ],
+            "settings": {
+                "yaml.schemas": {
+                    "./fabric.schema.json": "fabric.yml"
+                },
+                "python.defaultInterpreterPath": "/usr/local/bin/python"
+            }
+        }
+    }
+}

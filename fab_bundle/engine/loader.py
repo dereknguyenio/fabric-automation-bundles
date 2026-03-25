@@ -171,6 +171,19 @@ def load_bundle(
     except Exception as e:
         raise BundleLoadError(f"Error processing includes: {e}")
 
+    # Process bundle inheritance
+    if data.get("extends"):
+        parent_path = base_dir / data["extends"]
+        if parent_path.is_file():
+            try:
+                with open(parent_path) as pf:
+                    parent_data = yaml.safe_load(pf)
+                if parent_data and isinstance(parent_data, dict):
+                    parent_data = _resolve_includes(parent_data, parent_path.parent)
+                    data = _deep_merge(parent_data, data)
+            except Exception as e:
+                raise BundleLoadError(f"Error loading parent bundle '{data['extends']}': {e}")
+
     # First pass: create bundle to extract variable definitions
     try:
         preliminary = BundleDefinition.model_validate(data)

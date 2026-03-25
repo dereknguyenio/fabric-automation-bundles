@@ -424,6 +424,102 @@ class FabricClient:
         return self._request("POST", f"/workspaces/{workspace_id}/roleAssignments", data=body) or {}
 
     # -----------------------------------------------------------------------
+    # Environment operations
+    # -----------------------------------------------------------------------
+
+    def refresh_semantic_model(self, workspace_id: str, item_id: str) -> dict[str, Any] | None:
+        """Trigger a semantic model refresh."""
+        result = self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/semanticModels/{item_id}/refresh",
+        )
+        if result and "operation_url" in result:
+            return self._wait_for_operation(result["operation_url"], timeout=600)
+        return result
+
+    def publish_environment(self, workspace_id: str, item_id: str) -> dict[str, Any] | None:
+        """Publish a Spark environment (installs libraries)."""
+        result = self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/environments/{item_id}/staging/publish",
+        )
+        if result and "operation_url" in result:
+            return self._wait_for_operation(result["operation_url"], timeout=600)
+        return result
+
+    def update_environment_libraries(
+        self,
+        workspace_id: str,
+        item_id: str,
+        libraries: list[str],
+    ) -> dict[str, Any] | None:
+        """Update the library list for a Spark environment staging area."""
+        # Build pypi library config
+        pypi_libs = [{"name": lib} for lib in libraries]
+        return self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/environments/{item_id}/staging/libraries",
+            data={"pypiLibraries": pypi_libs},
+        )
+
+    # -----------------------------------------------------------------------
+    # Workspace tagging
+    # -----------------------------------------------------------------------
+
+    def update_item_tags(
+        self,
+        workspace_id: str,
+        item_id: str,
+        tags: list[dict[str, str]],
+    ) -> dict[str, Any] | None:
+        """Update tags on a workspace item."""
+        return self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/items/{item_id}/tags",
+            data={"tags": tags},
+        )
+
+    # -----------------------------------------------------------------------
+    # Capacity management (Azure Resource Manager)
+    # -----------------------------------------------------------------------
+
+    def resume_capacity(self, subscription_id: str, resource_group: str, capacity_name: str) -> dict[str, Any] | None:
+        """Resume a paused Fabric capacity via ARM API."""
+        url = (
+            f"https://management.azure.com/subscriptions/{subscription_id}"
+            f"/resourceGroups/{resource_group}/providers/Microsoft.Fabric"
+            f"/capacities/{capacity_name}/resume?api-version=2023-11-01"
+        )
+        try:
+            from azure.identity import DefaultAzureCredential
+            credential = DefaultAzureCredential()
+            token = credential.get_token("https://management.azure.com/.default")
+            resp = self._session.post(url, headers={"Authorization": f"Bearer {token.token}"}, timeout=60)
+            if resp.status_code in (200, 202):
+                return {"status": "resuming"}
+            return None
+        except Exception:
+            return None
+
+    def pause_capacity(self, subscription_id: str, resource_group: str, capacity_name: str) -> dict[str, Any] | None:
+        """Pause a Fabric capacity via ARM API."""
+        url = (
+            f"https://management.azure.com/subscriptions/{subscription_id}"
+            f"/resourceGroups/{resource_group}/providers/Microsoft.Fabric"
+            f"/capacities/{capacity_name}/suspend?api-version=2023-11-01"
+        )
+        try:
+            from azure.identity import DefaultAzureCredential
+            credential = DefaultAzureCredential()
+            token = credential.get_token("https://management.azure.com/.default")
+            resp = self._session.post(url, headers={"Authorization": f"Bearer {token.token}"}, timeout=60)
+            if resp.status_code in (200, 202):
+                return {"status": "pausing"}
+            return None
+        except Exception:
+            return None
+
+    # -----------------------------------------------------------------------
     # Utility
     # -----------------------------------------------------------------------
 
@@ -576,4 +672,58 @@ class FabricClient:
             "POST",
             f"/workspaces/{workspace_id}/warehouses/{warehouse_id}/executeQuery",
             data={"query": sql, "maxRows": 1000},
+        )
+
+    def execute_lakehouse_sql(
+        self,
+        workspace_id: str,
+        sql_endpoint_id: str,
+        sql: str,
+    ) -> dict[str, Any] | None:
+        """Execute SQL against a lakehouse SQL endpoint."""
+        return self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/sqlEndpoints/{sql_endpoint_id}/executeQuery",
+            data={"query": sql, "maxRows": 1000},
+        )
+
+    # -----------------------------------------------------------------------
+    # Job scheduling
+    # -----------------------------------------------------------------------
+
+    def create_item_schedule(
+        self,
+        workspace_id: str,
+        item_id: str,
+        schedule_config: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Create a schedule for an item."""
+        return self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/items/{item_id}/jobScheduler",
+            data=schedule_config,
+        ) or {}
+
+    def update_item_schedule(
+        self,
+        workspace_id: str,
+        item_id: str,
+        schedule_config: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Update a schedule for an item."""
+        return self._request(
+            "PATCH",
+            f"/workspaces/{workspace_id}/items/{item_id}/jobScheduler",
+            data=schedule_config,
+        )
+
+    def get_item_schedule(
+        self,
+        workspace_id: str,
+        item_id: str,
+    ) -> dict[str, Any] | None:
+        """Get the schedule for an item."""
+        return self._request(
+            "GET",
+            f"/workspaces/{workspace_id}/items/{item_id}/jobScheduler",
         )

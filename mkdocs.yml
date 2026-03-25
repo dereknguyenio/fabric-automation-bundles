@@ -1,0 +1,82 @@
+site_name: Fabric Automation Bundles
+site_url: https://dereknguyenio.github.io/fabric-automation-bundles/
+site_description: Declarative project definitions for Microsoft Fabric
+repo_url: https://github.com/dereknguyenio/fabric-automation-bundles
+repo_name: dereknguyenio/fabric-automation-bundles
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Your First Bundle: getting-started/first-bundle.md
+  - Guide:
+    - fabric.yml Reference: guide/fabric-yml.md
+    - Resource Types: guide/resource-types.md
+    - Targets & Variables: guide/targets-variables.md
+    - Security & Permissions: guide/security.md
+    - Secrets Management: guide/secrets.md
+    - Templates: guide/templates.md
+  - CLI Reference:
+    - Commands: cli/commands.md
+  - CI/CD:
+    - Overview: cicd/overview.md
+    - GitHub Actions: cicd/github-actions.md
+    - Azure DevOps: cicd/azure-devops.md
+  - Advanced:
+    - State Management: advanced/state.md
+    - Drift Detection: advanced/drift.md
+    - Policy Enforcement: advanced/policies.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dereknguyenio/fabric-automation-bundles
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/fabric-automation-bundles/

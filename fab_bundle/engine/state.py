@@ -136,6 +136,7 @@ class StateManager:
             )
 
         self.save(state)
+        self.record_history(state)
         return state
 
     def remove_resource(self, resource_key: str) -> None:
@@ -143,6 +144,49 @@ class StateManager:
         state = self.load()
         state.resources.pop(resource_key, None)
         self.save(state)
+
+    def acquire_lock(self, deployer_id: str = "", timeout_minutes: int = 30) -> bool:
+        """Acquire a deployment lock. Returns True if lock acquired."""
+        import socket
+        import os
+        lock_file = self._state_dir / f"lock-{self.target_name}.json"
+        self._state_dir.mkdir(parents=True, exist_ok=True)
+
+        if lock_file.exists():
+            try:
+                lock_data = json.loads(lock_file.read_text())
+                lock_time = lock_data.get("timestamp", 0)
+                # Check if lock is stale
+                if time.time() - lock_time > timeout_minutes * 60:
+                    pass  # Stale, override
+                else:
+                    return False  # Lock held
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        lock_data = {
+            "timestamp": time.time(),
+            "deployer": deployer_id or f"{os.environ.get('USER', 'unknown')}@{socket.gethostname()}",
+            "ci_run_id": os.environ.get("GITHUB_RUN_ID", os.environ.get("BUILD_BUILDID", "")),
+        }
+        lock_file.write_text(json.dumps(lock_data, indent=2))
+        return True
+
+    def release_lock(self) -> None:
+        """Release the deployment lock."""
+        lock_file = self._state_dir / f"lock-{self.target_name}.json"
+        if lock_file.exists():
+            lock_file.unlink()
+
+    def get_lock_info(self) -> dict[str, Any] | None:
+        """Get info about the current lock, or None if unlocked."""
+        lock_file = self._state_dir / f"lock-{self.target_name}.json"
+        if not lock_file.exists():
+            return None
+        try:
+            return json.loads(lock_file.read_text())
+        except (json.JSONDecodeError, KeyError):
+            return None
 
     def detect_drift(
         self,
@@ -175,6 +219,53 @@ class StateManager:
                 drift[key] = "modified"
 
         return drift
+
+
+    def record_history(self, state: DeploymentState, summary: str = "") -> None:
+        """Record a deployment in the history log."""
+        history_dir = self._state_dir / "history"
+        history_dir.mkdir(parents=True, exist_ok=True)
+
+        entry = {
+            "deploy_id": f"{int(state.last_deployed)}",
+            "timestamp": state.last_deployed,
+            "bundle_name": state.bundle_name,
+            "bundle_version": state.bundle_version,
+            "target": state.target_name,
+            "workspace_id": state.workspace_id,
+            "resource_count": len(state.resources),
+            "summary": summary,
+            "resources": {k: {"item_id": v.item_id, "type": v.item_type} for k, v in state.resources.items()},
+        }
+
+        filename = f"{int(state.last_deployed)}-{state.target_name}.json"
+        (history_dir / filename).write_text(json.dumps(entry, indent=2, default=str))
+
+    def list_history(self, limit: int = 20) -> list[dict[str, Any]]:
+        """List deployment history entries, most recent first."""
+        history_dir = self._state_dir / "history"
+        if not history_dir.exists():
+            return []
+
+        entries = []
+        for f in sorted(history_dir.glob("*.json"), reverse=True)[:limit]:
+            try:
+                entries.append(json.loads(f.read_text()))
+            except (json.JSONDecodeError, KeyError):
+                continue
+        return entries
+
+    def get_history_entry(self, deploy_id: str) -> dict[str, Any] | None:
+        """Get a specific deployment history entry."""
+        history_dir = self._state_dir / "history"
+        if not history_dir.exists():
+            return None
+        for f in history_dir.glob(f"{deploy_id}*.json"):
+            try:
+                return json.loads(f.read_text())
+            except (json.JSONDecodeError, KeyError):
+                continue
+        return None
 
 
 def compute_definition_hash(definition: dict[str, Any] | None) -> str | None:

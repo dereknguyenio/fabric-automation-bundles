@@ -110,7 +110,14 @@ class Deployer:
         else:
             # Wrap .py/.sql/.scala/.r in ipynb JSON structure
             lang_map = {".py": "python", ".sql": "sql", ".scala": "scala", ".r": "r"}
+            kernel_map = {
+                "python": "synapse_pyspark",
+                "sql": "sparksql",
+                "scala": "spark_scala",
+                "r": "sparkr",
+            }
             language = lang_map.get(file_ext, "python")
+            kernel = kernel_map.get(language, "synapse_pyspark")
 
             ipynb = {
                 "nbformat": 4,
@@ -126,6 +133,7 @@ class Deployer:
                 ],
                 "metadata": {
                     "language_info": {"name": language},
+                    "kernel_info": {"name": kernel},
                 },
             }
 
@@ -147,15 +155,75 @@ class Deployer:
     def _build_pipeline_definition(self, resource_key: str) -> dict[str, Any] | None:
         """Build Fabric item definition for a pipeline."""
         pipeline = self.bundle.resources.pipelines.get(resource_key)
-        if not pipeline or not pipeline.path:
+        if not pipeline:
             return None
 
-        content = self._read_file_as_base64(pipeline.path)
+        if pipeline.path:
+            # User-provided pipeline JSON
+            content = self._read_file_as_base64(pipeline.path)
+            return {
+                "parts": [
+                    {
+                        "path": "pipeline-content.json",
+                        "payload": content,
+                        "payloadType": "InlineBase64",
+                    }
+                ],
+            }
+
+        if not pipeline.activities:
+            return None
+
+        # Generate pipeline JSON from YAML activities
+        activities = []
+        for activity in pipeline.activities:
+            act_def: dict[str, Any] = {
+                "name": activity.name or activity.notebook or activity.pipeline or "unnamed",
+                "type": "TridentNotebook" if activity.notebook else "ExecutePipeline",
+            }
+
+            if activity.notebook:
+                act_def["typeProperties"] = {
+                    "notebookReference": {
+                        "referenceName": activity.notebook,
+                        "type": "NotebookReference",
+                    },
+                }
+                if activity.parameters:
+                    act_def["typeProperties"]["parameters"] = {
+                        k: {"value": v, "type": "string"} for k, v in activity.parameters.items()
+                    }
+            elif activity.pipeline:
+                act_def["typeProperties"] = {
+                    "pipeline": {
+                        "referenceName": activity.pipeline,
+                        "type": "PipelineReference",
+                    },
+                }
+
+            if activity.depends_on:
+                act_def["dependsOn"] = [
+                    {"activity": dep, "dependencyConditions": ["Succeeded"]}
+                    for dep in activity.depends_on
+                ]
+
+            activities.append(act_def)
+
+        pipeline_json = {
+            "properties": {
+                "activities": activities,
+            },
+        }
+
+        content_b64 = base64.b64encode(
+            json.dumps(pipeline_json).encode("utf-8")
+        ).decode("utf-8")
+
         return {
             "parts": [
                 {
                     "path": "pipeline-content.json",
-                    "payload": content,
+                    "payload": content_b64,
                     "payloadType": "InlineBase64",
                 }
             ],
@@ -487,6 +555,90 @@ class Deployer:
                     except Exception as e:
                         self.console.print(f"    [yellow]Warning:[/yellow] OneLake role failed on {lh_key}: {e}")
 
+    def _publish_environments(self, workspace_id: str) -> None:
+        """Publish Spark environments to install libraries."""
+        if not self.bundle.resources.environments:
+            return
+
+        for key, env in self.bundle.resources.environments.items():
+            if not env.libraries:
+                continue
+
+            try:
+                items = self.client.get_workspace_items_map(workspace_id)
+                env_info = items.get(key)
+                if not env_info:
+                    continue
+
+                if self.dry_run:
+                    self.console.print(f"  [dim]Would publish environment: {key} ({len(env.libraries)} libraries)[/dim]")
+                    continue
+
+                self.console.print(f"  Publishing environment: {key}...")
+                try:
+                    self.client.update_environment_libraries(workspace_id, env_info["id"], env.libraries)
+                    self.client.publish_environment(workspace_id, env_info["id"])
+                    self.console.print(f"    Published: {key} ({', '.join(env.libraries)})")
+                except Exception as e:
+                    self.console.print(f"    [yellow]Warning:[/yellow] Environment publish failed for {key}: {e}")
+            except Exception as e:
+                self.console.print(f"    [yellow]Warning:[/yellow] Environment {key}: {e}")
+
+    def _deploy_schedules(self, workspace_id: str) -> None:
+        """Deploy pipeline schedules via the Job Scheduler API."""
+        for key, pipeline in self.bundle.resources.pipelines.items():
+            if not pipeline.schedule:
+                continue
+
+            try:
+                items = self.client.get_workspace_items_map(workspace_id)
+                pipeline_info = items.get(key)
+                if not pipeline_info:
+                    continue
+
+                schedule = pipeline.schedule
+                schedule_config = {
+                    "enabled": schedule.enabled,
+                    "configuration": {
+                        "type": "Cron",
+                        "cronExpression": schedule.cron or "0 6 * * *",
+                        "startDateTime": schedule.start_time or "2024-01-01T00:00:00Z",
+                        "timeZone": schedule.timezone,
+                    },
+                }
+
+                if self.dry_run:
+                    self.console.print(f"  [dim]Would set schedule for {key}: {schedule.cron}[/dim]")
+                else:
+                    try:
+                        self.client.create_item_schedule(workspace_id, pipeline_info["id"], schedule_config)
+                        self.console.print(f"    Schedule: {key} → {schedule.cron} ({schedule.timezone})")
+                    except Exception:
+                        # Try update if create fails (schedule already exists)
+                        self.client.update_item_schedule(workspace_id, pipeline_info["id"], schedule_config)
+                        self.console.print(f"    Schedule updated: {key} → {schedule.cron}")
+            except Exception as e:
+                self.console.print(f"    [yellow]Warning:[/yellow] Schedule for {key} failed: {e}")
+
+    def _refresh_semantic_models(self, workspace_id: str) -> None:
+        """Trigger refresh for semantic models with auto_refresh enabled."""
+        for key, model in self.bundle.resources.semantic_models.items():
+            if not model.auto_refresh:
+                continue
+            try:
+                items = self.client.get_workspace_items_map(workspace_id)
+                item_info = items.get(key)
+                if not item_info:
+                    continue
+                if self.dry_run:
+                    self.console.print(f"  [dim]Would refresh semantic model: {key}[/dim]")
+                else:
+                    self.console.print(f"  Refreshing semantic model: {key}...")
+                    self.client.refresh_semantic_model(workspace_id, item_info["id"])
+                    self.console.print(f"    Refresh complete: {key}")
+            except Exception as e:
+                self.console.print(f"    [yellow]Warning:[/yellow] Refresh failed for {key}: {e}")
+
     def _deploy_shortcuts(self, workspace_id: str) -> None:
         """Deploy OneLake shortcuts for lakehouses."""
         for key, lakehouse in self.bundle.resources.lakehouses.items():
@@ -525,6 +677,34 @@ class Deployer:
                     self.console.print(f"    Created shortcut: {shortcut.name} in {key}")
                 except Exception as e:
                     self.console.print(f"    [yellow]Warning:[/yellow] Shortcut '{shortcut.name}' failed: {e}")
+
+    def _run_post_deploy_validation(self, workspace_id: str, target_name: str | None) -> list[str]:
+        """Run post-deploy validation checks. Returns list of failures."""
+        target = self.bundle.resolve_target(target_name)
+        if not target.post_deploy:
+            return []
+
+        self.console.print("  Running post-deploy validation...")
+        failures = []
+
+        for check in target.post_deploy:
+            if check.run:
+                try:
+                    items = self.client.get_workspace_items_map(workspace_id)
+                    item_info = items.get(check.run)
+                    if item_info:
+                        job_type = "RunNotebook" if item_info.get("type") == "Notebook" else "Pipeline"
+                        self.client.run_item_job(workspace_id, item_info["id"], job_type)
+                        self.console.print(f"    [green]✓[/green] {check.run}: triggered")
+                    else:
+                        failures.append(f"{check.run}: not found in workspace")
+                except Exception as e:
+                    failures.append(f"{check.run}: {e}")
+
+            elif check.sql:
+                self.console.print(f"    [dim]SQL validation not yet wired to endpoint[/dim]")
+
+        return failures
 
     def _rollback(self, workspace_id: str, result: DeployResult) -> None:
         """Attempt to rollback created items on failure."""
@@ -659,6 +839,16 @@ class Deployer:
 
             definition = self._get_item_definition(item.resource_key, item.resource_type)
 
+            # Skip if definition unchanged (incremental deploy)
+            if definition and self.state_manager and not getattr(self, '_force_deploy', False):
+                from fab_bundle.engine.state import compute_definition_hash
+                new_hash = compute_definition_hash(definition)
+                state = self.state_manager.load()
+                stored = state.resources.get(item.resource_key)
+                if stored and stored.definition_hash and stored.definition_hash == new_hash:
+                    self.console.print(f"  [dim]=[/dim] {item.resource_key}: unchanged, skipping")
+                    return True
+
             if self.dry_run:
                 self.console.print(f"  [yellow]~[/yellow] Would update {item.resource_type}: {item.resource_key}")
                 return True
@@ -687,7 +877,7 @@ class Deployer:
 
         return True  # NO_CHANGE
 
-    def execute(self, plan: DeploymentPlan, target_name: str | None = None) -> DeployResult:
+    def execute(self, plan: DeploymentPlan, target_name: str | None = None, force: bool = False) -> DeployResult:
         """
         Execute a deployment plan.
 
@@ -699,6 +889,18 @@ class Deployer:
             DeployResult with outcomes.
         """
         result = DeployResult(success=True)
+        self._force_deploy = force
+
+        # Acquire deployment lock
+        if self.state_manager and not self.dry_run:
+            lock_info = self.state_manager.get_lock_info()
+            if lock_info and not getattr(self, '_force_deploy', False):
+                self.console.print(f"[red]Deployment locked[/red] by {lock_info.get('deployer', 'unknown')} at {lock_info.get('timestamp', '?')}")
+                self.console.print("  Use --force to override.")
+                result.success = False
+                result.errors.append("Deployment locked")
+                return result
+            self.state_manager.acquire_lock()
 
         if not plan.has_changes:
             self.console.print("[dim]No changes to deploy.[/dim]")
@@ -774,12 +976,21 @@ class Deployer:
 
         # Deploy security, git, connections, SQL scripts (only on success)
         if result.success and not self.dry_run:
+            self._publish_environments(workspace_id)
             self._deploy_security(workspace_id)
             self._deploy_onelake_roles(workspace_id)
             self._deploy_git_integration(workspace_id)
             self._deploy_connections()
             self._deploy_shortcuts(workspace_id)
+            self._deploy_schedules(workspace_id)
             self._execute_sql_scripts(workspace_id)
+            self._refresh_semantic_models(workspace_id)
+
+            validation_failures = self._run_post_deploy_validation(workspace_id, target_name)
+            if validation_failures:
+                self.console.print("[yellow]Post-deploy validation warnings:[/yellow]")
+                for f in validation_failures:
+                    self.console.print(f"  [yellow]![/yellow] {f}")
 
         # Save state
         if result.success and not self.dry_run and self.state_manager:
@@ -823,5 +1034,9 @@ class Deployer:
             f"  Created: {result.items_created}  Updated: {result.items_updated}  "
             f"Deleted: {result.items_deleted}  Failed: {result.items_failed}"
         )
+
+        # Release lock
+        if self.state_manager and not self.dry_run:
+            self.state_manager.release_lock()
 
         return result

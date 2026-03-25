@@ -113,6 +113,13 @@ class ShortcutConfig(BaseModel):
     subfolder: str | None = None
 
 
+class TableSchema(BaseModel):
+    """Delta table schema definition."""
+    schema_path: str | None = Field(None, description="Path to JSON schema file")
+    partition_by: list[str] = Field(default_factory=list)
+    description: str | None = None
+
+
 class LakehouseResource(BaseModel):
     """Lakehouse resource definition."""
     description: str | None = None
@@ -120,6 +127,7 @@ class LakehouseResource(BaseModel):
     shortcuts: list[ShortcutConfig] = Field(default_factory=list)
     enable_schemas: bool = Field(True, description="Enable lakehouse schemas feature")
     sql_endpoint_enabled: bool = True
+    tables: dict[str, TableSchema] = Field(default_factory=dict, description="Delta table definitions")
 
 
 class NotebookResource(BaseModel):
@@ -128,7 +136,9 @@ class NotebookResource(BaseModel):
     description: str | None = None
     environment: str | None = Field(None, description="Reference to an environment resource key")
     default_lakehouse: str | None = Field(None, description="Reference to a lakehouse resource key")
+    external_lakehouse: str | None = Field(None, description="Cross-workspace lakehouse ref (workspace://ws-name/item)")
     spark_properties: dict[str, str] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Default parameters for notebook execution")
     folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
@@ -171,6 +181,10 @@ class SemanticModelResource(BaseModel):
     path: str = Field(..., description="Path to semantic model definition directory")
     description: str | None = None
     default_lakehouse: str | None = None
+    auto_refresh: bool = Field(False, description="Auto-refresh after deploy")
+    refresh_timeout: int = Field(600, description="Refresh timeout in seconds")
+    after_deploy: list[str] = Field(default_factory=list, description="Actions to run after deploy (e.g., 'refresh')")
+    depends_on_run: list[str] = Field(default_factory=list, description="Only refresh if these resources ran successfully")
     folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
@@ -179,6 +193,7 @@ class ReportResource(BaseModel):
     path: str = Field(..., description="Path to .pbir or report definition")
     description: str | None = None
     semantic_model: str | None = Field(None, description="Reference to a semantic_model resource key")
+    external_semantic_model: str | None = Field(None, description="Cross-workspace model ref (workspace://ws-name/item)")
     folder: str | None = Field(None, description="Workspace folder path (e.g., 'ETL/Bronze')")
 
 
@@ -285,6 +300,21 @@ class RunAsConfig(BaseModel):
     user_name: str | None = None
 
 
+class ValidationCheck(BaseModel):
+    """Post-deploy validation check."""
+    run: str | None = Field(None, description="Resource name to run")
+    sql: str | None = Field(None, description="SQL query to execute")
+    expect: str | None = Field(None, description="Expected result (e.g., 'success', '> 0')")
+    timeout: int = Field(300, description="Timeout in seconds")
+
+
+class DeploymentStrategy(BaseModel):
+    """Deployment strategy configuration."""
+    type: str = Field("all-at-once", description="Deployment strategy: all-at-once, canary")
+    canary_resources: list[str] = Field(default_factory=list, description="Resources to deploy first in canary")
+    validation: ValidationCheck | None = None
+
+
 class TargetConfig(BaseModel):
     """Environment target (dev, staging, prod)."""
     default: bool = False
@@ -293,6 +323,8 @@ class TargetConfig(BaseModel):
     run_as: RunAsConfig | None = None
     security: SecurityConfig | None = None
     resources: ResourceOverrides | None = None
+    post_deploy: list[ValidationCheck] = Field(default_factory=list, description="Post-deploy validation checks")
+    deployment_strategy: DeploymentStrategy | None = None
 
 
 class ResourceOverrides(BaseModel):
@@ -394,6 +426,37 @@ class BundleMetadata(BaseModel):
     name: str = Field(..., description="Bundle name (used as identifier)")
     version: str = Field("0.1.0", description="Bundle version")
     description: str | None = None
+    depends_on: list[str] = Field(default_factory=list, description="Paths to dependent bundle files")
+
+
+class NotificationConfig(BaseModel):
+    """Notification configuration."""
+    type: str = Field(..., description="Notification type: slack, teams")
+    webhook: str = Field(..., description="Webhook URL (use ${secret.WEBHOOK} for secrets)")
+    message: str = Field("Deployed {bundle.name} v{bundle.version} to {target}", description="Message template")
+
+
+class NotificationsConfig(BaseModel):
+    """Notifications configuration."""
+    on_success: list[NotificationConfig] = Field(default_factory=list)
+    on_failure: list[NotificationConfig] = Field(default_factory=list)
+
+
+class PolicyRule(BaseModel):
+    """A single policy rule for validation."""
+    name: str
+    check: str = Field(..., description="Policy check type: require_description, naming_convention, max_resources, etc.")
+    value: Any = None
+    severity: str = Field("error", description="error or warning")
+
+
+class PolicyConfig(BaseModel):
+    """Policy enforcement configuration."""
+    rules: list[PolicyRule] = Field(default_factory=list)
+    require_description: bool = False
+    naming_convention: str | None = Field(None, description="snake_case, camelCase, etc.")
+    max_notebook_size_kb: int | None = None
+    blocked_libraries: list[str] = Field(default_factory=list)
 
 
 class BundleDefinition(BaseModel):
@@ -407,10 +470,13 @@ class BundleDefinition(BaseModel):
     bundle: BundleMetadata
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
     include: list[str] = Field(default_factory=list, description="Additional YAML files to merge")
+    extends: str | None = Field(None, description="Path to parent bundle to inherit from")
     variables: dict[str, VariableDefinition | str] = Field(default_factory=dict)
     resources: ResourcesConfig = Field(default_factory=ResourcesConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     connections: dict[str, ConnectionConfig] = Field(default_factory=dict)
+    policies: PolicyConfig = Field(default_factory=PolicyConfig)
+    notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
     targets: dict[str, TargetConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")

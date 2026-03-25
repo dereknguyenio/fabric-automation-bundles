@@ -3,18 +3,29 @@ Remote state backends for deployment state persistence.
 
 Supports:
 - local: File-based state in .fab-bundle/ (default)
+- onelake: OneLake (Fabric lakehouse) — recommended for Fabric projects
 - azureblob: Azure Blob Storage
 - adls: Azure Data Lake Storage Gen2
 
 Configuration in fabric.yml:
+
+    # Recommended — store state in a Fabric lakehouse via OneLake
+    state:
+      backend: onelake
+      config:
+        workspace_id: "your-workspace-guid"
+        lakehouse_id: "your-lakehouse-guid"
+        # Optional: subfolder (default: .fab-bundle-state)
+        path: ".fab-bundle-state"
+
+    # Alternative — Azure Blob Storage
     state:
       backend: azureblob
       config:
         account_name: mystorageaccount
         container_name: fab-bundle-state
-        # Optional: uses DefaultAzureCredential if no key provided
-        account_key: ${secret.STORAGE_ACCOUNT_KEY}
 
+    # Alternative — ADLS Gen2
     state:
       backend: adls
       config:
@@ -394,6 +405,140 @@ class ADLSBackend(StateBackend):
             return None
 
 
+class OneLakeBackend(StateBackend):
+    """OneLake (Fabric lakehouse) state backend.
+
+    Stores state files in a lakehouse's Files section via the OneLake ADLS-compatible endpoint.
+    This is the recommended backend for Fabric projects — state lives alongside your data.
+
+    OneLake endpoint: https://onelake.dfs.fabric.microsoft.com/
+    Path format: {workspace_id}/{lakehouse_id}/Files/{path}/{key}.json
+    """
+
+    def __init__(self, config: dict[str, str]):
+        self._workspace_id = config["workspace_id"]
+        self._lakehouse_id = config["lakehouse_id"]
+        self._path = config.get("path", ".fab-bundle-state")
+        self._client = None
+
+    def _get_fs_client(self):
+        if self._client:
+            return self._client
+
+        from azure.identity import DefaultAzureCredential
+        from azure.storage.filedatalake import DataLakeServiceClient
+
+        account_url = "https://onelake.dfs.fabric.microsoft.com"
+        service = DataLakeServiceClient(account_url, credential=DefaultAzureCredential())
+        # OneLake filesystem = workspace_id, directory = lakehouse_id/Files/...
+        self._client = service.get_file_system_client(self._workspace_id)
+        return self._client
+
+    def _file_path(self, key: str) -> str:
+        return f"{self._lakehouse_id}/Files/{self._path}/{key}.json"
+
+    def read(self, key: str) -> dict[str, Any] | None:
+        try:
+            fs = self._get_fs_client()
+            file = fs.get_file_client(self._file_path(key))
+            data = file.download_file().readall()
+            return json.loads(data)
+        except Exception:
+            return None
+
+    def write(self, key: str, data: dict[str, Any]) -> None:
+        fs = self._get_fs_client()
+        # Ensure directory exists
+        dir_path = f"{self._lakehouse_id}/Files/{self._path}"
+        try:
+            dir_client = fs.get_directory_client(dir_path)
+            dir_client.create_directory()
+        except Exception:
+            pass  # Already exists
+
+        file = fs.get_file_client(self._file_path(key))
+        content = json.dumps(data, indent=2, default=str).encode("utf-8")
+        file.upload_data(content, overwrite=True)
+
+    def delete(self, key: str) -> None:
+        try:
+            fs = self._get_fs_client()
+            file = fs.get_file_client(self._file_path(key))
+            file.delete_file()
+        except Exception:
+            pass
+
+    def exists(self, key: str) -> bool:
+        try:
+            fs = self._get_fs_client()
+            file = fs.get_file_client(self._file_path(key))
+            file.get_file_properties()
+            return True
+        except Exception:
+            return False
+
+    def list_keys(self, prefix: str = "") -> list[str]:
+        try:
+            fs = self._get_fs_client()
+            dir_path = f"{self._lakehouse_id}/Files/{self._path}"
+            keys = []
+            for path in fs.get_paths(path=dir_path):
+                name = path.name.split("/")[-1]
+                if name.endswith(".json") and not name.endswith(".lock"):
+                    key = name.replace(".json", "")
+                    if key.startswith(prefix):
+                        keys.append(key)
+            return sorted(keys)
+        except Exception:
+            return []
+
+    def acquire_lock(self, key: str, owner: str, timeout_seconds: int = 1800) -> bool:
+        import time
+        try:
+            fs = self._get_fs_client()
+            lock_path = self._file_path(key).replace(".json", ".lock")
+            file = fs.get_file_client(lock_path)
+
+            # Ensure lock file exists
+            try:
+                file.get_file_properties()
+            except Exception:
+                file.upload_data(json.dumps({"owner": owner, "timestamp": time.time()}).encode(), overwrite=True)
+
+            # Acquire lease
+            lease = file.acquire_lease(lease_duration=60)
+            file.upload_data(
+                json.dumps({"owner": owner, "timestamp": time.time(), "lease_id": lease.id}).encode(),
+                overwrite=True,
+                lease=lease,
+            )
+            self._lease = lease
+            return True
+        except Exception:
+            return False
+
+    def release_lock(self, key: str) -> None:
+        try:
+            if hasattr(self, "_lease") and self._lease:
+                self._lease.release()
+                self._lease = None
+        except Exception:
+            pass
+
+    def get_lock_info(self, key: str) -> dict[str, Any] | None:
+        try:
+            fs = self._get_fs_client()
+            lock_path = self._file_path(key).replace(".json", ".lock")
+            file = fs.get_file_client(lock_path)
+            props = file.get_file_properties()
+            if props.lease.status == "locked":
+                data = file.download_file().readall()
+                return json.loads(data)
+            return None
+        except Exception:
+            return None
+
+
 def create_backend(backend_type: str = "local", config: dict[str, Any] | None = None, project_dir: Path | None = None) -> StateBackend:
     """Factory function to create a state backend."""
     config = config or {}
@@ -409,5 +554,9 @@ def create_backend(backend_type: str = "local", config: dict[str, Any] | None = 
         if "account_name" not in config:
             raise ValueError("ADLS backend requires 'account_name' in config")
         return ADLSBackend(config)
+    elif backend_type == "onelake":
+        if "workspace_id" not in config or "lakehouse_id" not in config:
+            raise ValueError("OneLake backend requires 'workspace_id' and 'lakehouse_id' in config")
+        return OneLakeBackend(config)
     else:
         raise ValueError(f"Unknown state backend: {backend_type}. Supported: local, azureblob, adls")

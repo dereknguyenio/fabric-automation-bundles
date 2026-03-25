@@ -43,6 +43,7 @@ nav:
     - Security & Permissions: guide/security.md
     - Secrets Management: guide/secrets.md
     - Templates: guide/templates.md
+    - MCP Server: guide/mcp-server.md
   - CLI Reference:
     - Commands: cli/commands.md
   - CI/CD:

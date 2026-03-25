@@ -106,12 +106,28 @@ class GitIntegrationConfig(BaseModel):
 # Sub-models: Resources
 # ---------------------------------------------------------------------------
 
+class ShortcutTransformation(BaseModel):
+    """Shortcut transformation — auto-converts files to Delta tables."""
+    type: str = Field("file", description="Transformation type: file, ai")
+    source_format: str | None = Field(None, description="Source format: csv, parquet, json, excel")
+    destination_table: str | None = Field(None, description="Target Delta table name")
+    sync: bool = Field(True, description="Keep in sync with source (always-on)")
+    # AI-powered transformation options
+    ai_skill: str | None = Field(None, description="AI skill: summarize, translate, classify")
+    ai_model: str | None = Field(None, description="AI model to use for transformation")
+    ai_prompt: str | None = Field(None, description="Custom prompt for AI transformation")
+    # File transformation options
+    flatten: bool = Field(False, description="Deep flatten nested JSON/Parquet")
+    compression: str | None = Field(None, description="Source compression: gzip, snappy, zstd")
+
+
 class ShortcutConfig(BaseModel):
     """OneLake shortcut definition."""
     name: str
     target: str = Field(..., description="Target path (adls://, s3://, onelake://)")
     path: str = Field("Tables", description="Shortcut location in lakehouse (Tables or Files)")
     connection_id: str | None = Field(None, description="Connection ID for authenticated shortcuts")
+    transformation: ShortcutTransformation | None = Field(None, description="Auto-transform files to Delta tables")
 
 
 class TableSchema(BaseModel):

@@ -1,0 +1,118 @@
+# Shortcut Transformations Example
+# Auto-convert source files to Delta tables — always in sync, no pipelines
+#
+# Supports:
+#   - File transformations: CSV, Parquet, JSON, Excel → Delta
+#   - AI transformations: summarize, translate, classify
+
+bundle:
+  name: shortcut-transformations
+  version: "1.0.0"
+  description: "Auto-ingest external data via shortcut transformations"
+
+resources:
+  lakehouses:
+    raw_data:
+      description: "Landing zone with auto-transforming shortcuts"
+      enable_schemas: true
+      shortcuts:
+        # --- File Transformations ---
+
+        # CSV files → Delta table (always in sync)
+        - name: sales_csv
+          target: "adls://datalake/sales/daily/*.csv"
+          path: Files
+          connection_id: "${var.adls_connection_id}"
+          transformation:
+            type: file
+            source_format: csv
+            destination_table: raw_sales
+            sync: true
+
+        # Nested JSON → flattened Delta table
+        - name: api_events
+          target: "adls://datalake/events/*.json.gz"
+          path: Files
+          connection_id: "${var.adls_connection_id}"
+          transformation:
+            type: file
+            source_format: json
+            destination_table: raw_events
+            flatten: true
+            compression: gzip
+
+        # Parquet from S3 partner feed
+        - name: partner_data
+          target: "s3://partner-bucket/shared/products/"
+          path: Files
+          transformation:
+            type: file
+            source_format: parquet
+            destination_table: partner_products
+
+        # Excel finance reports → Delta
+        - name: finance_reports
+          target: "adls://datalake/finance/monthly/*.xlsx"
+          path: Files
+          connection_id: "${var.adls_connection_id}"
+          transformation:
+            type: file
+            source_format: excel
+            destination_table: finance_monthly
+
+    # --- AI-Powered Transformations ---
+    documents:
+      description: "Unstructured data with AI processing"
+      shortcuts:
+        # Summarize support tickets
+        - name: support_tickets
+          target: "adls://datalake/support/tickets/*.json"
+          path: Files
+          connection_id: "${var.adls_connection_id}"
+          transformation:
+            type: ai
+            ai_skill: summarize
+            destination_table: ticket_summaries
+
+        # Translate multilingual feedback
+        - name: global_feedback
+          target: "adls://datalake/feedback/global/*.json"
+          path: Files
+          connection_id: "${var.adls_connection_id}"
+          transformation:
+            type: ai
+            ai_skill: translate
+            ai_prompt: "Translate to English, preserve sentiment"
+            destination_table: feedback_english
+
+        # Classify customer emails
+        - name: customer_emails
+          target: "adls://datalake/emails/inbox/*.json"
+          path: Files
+          connection_id: "${var.adls_connection_id}"
+          transformation:
+            type: ai
+            ai_skill: classify
+            ai_prompt: "Classify as: complaint, inquiry, feedback, urgent, spam"
+            destination_table: classified_emails
+
+  notebooks:
+    analyze_transformed:
+      path: ./notebooks/analyze.py
+      description: "Analyze auto-transformed Delta tables"
+      default_lakehouse: raw_data
+
+targets:
+  dev:
+    default: true
+    workspace:
+      name: shortcut-transforms-dev
+      capacity_id: "${var.capacity_id}"
+
+variables:
+  capacity_id:
+    description: "Fabric capacity GUID"
+    default: "REPLACE-WITH-YOUR-CAPACITY-GUID"
+  adls_connection_id:
+    description: "ADLS connection GUID for authenticated shortcuts"
+    default: ""

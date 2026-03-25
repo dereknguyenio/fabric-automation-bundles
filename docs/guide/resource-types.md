@@ -98,9 +98,82 @@ lakehouses:
 ```
 
 Supported shortcut targets:
+
 - `adls://` — Azure Data Lake Storage Gen2
 - `s3://` — Amazon S3
 - `onelake://` — Cross-workspace OneLake reference
+
+### Shortcut Transformations
+
+Auto-convert source files to managed Delta tables — always in sync, no pipelines required.
+
+**File transformations** convert CSV, Parquet, JSON, or Excel files into Delta tables:
+
+```yaml
+lakehouses:
+  bronze_lakehouse:
+    shortcuts:
+      - name: csv_sales_data
+        target: "adls://datalake/sales/*.csv"
+        path: Files
+        transformation:
+          type: file
+          source_format: csv
+          destination_table: raw_sales
+          sync: true
+          flatten: false
+
+      - name: nested_json_events
+        target: "adls://datalake/events/*.json"
+        path: Files
+        transformation:
+          type: file
+          source_format: json
+          destination_table: raw_events
+          flatten: true
+          compression: gzip
+
+      - name: excel_reports
+        target: "adls://datalake/finance/*.xlsx"
+        path: Files
+        transformation:
+          type: file
+          source_format: excel
+          destination_table: finance_reports
+```
+
+**AI-powered transformations** apply summarization, translation, or classification:
+
+```yaml
+lakehouses:
+  documents_lakehouse:
+    shortcuts:
+      - name: support_tickets
+        target: "adls://datalake/tickets/*.json"
+        path: Files
+        transformation:
+          type: ai
+          ai_skill: summarize
+          destination_table: ticket_summaries
+
+      - name: multilingual_docs
+        target: "adls://datalake/docs/*.json"
+        path: Files
+        transformation:
+          type: ai
+          ai_skill: translate
+          ai_prompt: "Translate to English"
+          destination_table: docs_english
+
+      - name: email_classification
+        target: "adls://datalake/emails/*.json"
+        path: Files
+        transformation:
+          type: ai
+          ai_skill: classify
+          ai_prompt: "Classify as: complaint, inquiry, feedback, spam"
+          destination_table: classified_emails
+```
 
 ## Lakehouse
 

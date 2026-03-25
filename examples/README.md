@@ -23,6 +23,7 @@ Working examples you can copy and deploy to your Fabric tenant.
 | 04 | [Data Science](04-data-science/) | ML experiments, training pipelines, Spark jobs | Intermediate |
 | 05 | [Multi-Environment](05-multi-environment/) | Policies, secrets, canary deploy, notifications | Advanced |
 | 06 | [Shortcuts & Connections](06-shortcuts-and-connections/) | ADLS, S3, cross-workspace shortcuts | Intermediate |
+| 07 | [Shortcut Transformations](07-shortcut-transformations/) | CSV/JSON/Excel → Delta, AI summarize/translate/classify | Intermediate |
 
 ## Finding Your Capacity GUID
 

@@ -1,0 +1,11 @@
+name: medallion
+description: "Medallion lakehouse architecture (bronze/silver/gold) with pipelines, semantic model, and Data Agent"
+version: "1.0.0"
+author: "Fabric Automation Bundles"
+variables:
+  project_name:
+    description: "Name of the project"
+    default: "my-fabric-project"
+  capacity_sku:
+    description: "Fabric capacity SKU"
+    default: "F64"

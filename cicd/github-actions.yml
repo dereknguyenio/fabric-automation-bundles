@@ -1,0 +1,117 @@
+# Fabric Automation Bundles — GitHub Actions CI/CD Pipeline
+# 
+# This workflow validates on every PR and deploys on merge to main.
+#
+# Required secrets:
+#   AZURE_TENANT_ID      — Azure AD tenant ID
+#   AZURE_CLIENT_ID      — Service principal app ID
+#   AZURE_CLIENT_SECRET  — Service principal secret
+#
+# Optional variables:
+#   FABRIC_CAPACITY_ID   — Fabric capacity to assign to workspaces
+
+name: Fabric Bundle CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'fabric.yml'
+      - 'resources/**'
+      - 'notebooks/**'
+      - 'pipelines/**'
+      - 'sql/**'
+      - 'semantic_model/**'
+      - 'reports/**'
+      - 'agent/**'
+
+  push:
+    branches: [main]
+    paths:
+      - 'fabric.yml'
+      - 'resources/**'
+      - 'notebooks/**'
+      - 'pipelines/**'
+      - 'sql/**'
+      - 'semantic_model/**'
+      - 'reports/**'
+      - 'agent/**'
+
+env:
+  PYTHON_VERSION: '3.12'
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Validate — runs on every PR
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validate Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install fabric-automation-bundles
+        run: pip install fabric-automation-bundles
+
+      - name: Validate bundle definition
+        run: fab-bundle validate
+
+      - name: Plan (dry-run) against dev
+        run: fab-bundle plan -t dev
+
+  # ---------------------------------------------------------------------------
+  # Deploy to Staging — on merge to main
+  # ---------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy to Staging
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install fabric-automation-bundles
+        run: pip install fabric-automation-bundles
+
+      - name: Plan staging deployment
+        run: fab-bundle plan -t staging
+
+      - name: Deploy to staging
+        run: fab-bundle deploy -t staging -y
+
+  # ---------------------------------------------------------------------------
+  # Deploy to Production — manual approval via GitHub environment
+  # ---------------------------------------------------------------------------
+  deploy-prod:
+    name: Deploy to Production
+    needs: deploy-staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production  # Requires manual approval in GitHub settings
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install fabric-automation-bundles
+        run: pip install fabric-automation-bundles
+
+      - name: Plan production deployment
+        run: fab-bundle plan -t prod
+
+      - name: Deploy to production
+        run: fab-bundle deploy -t prod -y

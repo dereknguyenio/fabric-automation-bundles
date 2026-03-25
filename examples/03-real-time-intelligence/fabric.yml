@@ -1,0 +1,55 @@
+# Real-Time Intelligence Example
+# Eventhouse + Eventstream + KQL for streaming analytics
+
+bundle:
+  name: realtime-analytics
+  version: "1.0.0"
+  description: "Real-time streaming analytics with Eventhouse and Eventstream"
+
+resources:
+  eventhouses:
+    telemetry_eventhouse:
+      description: "Eventhouse for IoT telemetry data"
+      kql_scripts:
+        - ./kql/create_tables.kql
+
+  kql_databases:
+    telemetry_db:
+      description: "KQL database for device telemetry"
+      parent_eventhouse: telemetry_eventhouse
+
+  eventstreams:
+    device_telemetry_stream:
+      description: "Ingests IoT device events in real-time"
+
+  kql_querysets:
+    telemetry_queries:
+      description: "Pre-built KQL queries for telemetry analysis"
+      path: ./kql/queries/
+      data_source: telemetry_db
+
+  kql_dashboards:
+    operations_dashboard:
+      description: "Real-time operations monitoring dashboard"
+      data_source: telemetry_db
+
+  reflex:
+    anomaly_alerts:
+      description: "Data Activator rules for anomaly detection"
+      path: ./reflex/anomaly_rules.json
+
+targets:
+  dev:
+    default: true
+    workspace:
+      name: realtime-analytics-dev
+      capacity_id: "${var.capacity_id}"
+  prod:
+    workspace:
+      name: realtime-analytics-prod
+      capacity_id: "${var.capacity_id}"
+
+variables:
+  capacity_id:
+    description: "Fabric capacity GUID"
+    default: "REPLACE-WITH-YOUR-CAPACITY-GUID"

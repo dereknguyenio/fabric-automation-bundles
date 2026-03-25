@@ -1,0 +1,23 @@
+// Create telemetry ingestion table
+.create-merge table DeviceTelemetry (
+    DeviceId: string,
+    Timestamp: datetime,
+    Temperature: real,
+    Humidity: real,
+    Pressure: real,
+    BatteryLevel: real,
+    Location: dynamic
+)
+
+// Enable streaming ingestion
+.alter table DeviceTelemetry policy streamingingestion enable
+
+// Create mapping for JSON ingestion
+.create-or-alter table DeviceTelemetry ingestion json mapping 'TelemetryMapping'
+    '[{"column":"DeviceId","path":"$.deviceId"},{"column":"Timestamp","path":"$.timestamp"},{"column":"Temperature","path":"$.temperature"},{"column":"Humidity","path":"$.humidity"},{"column":"Pressure","path":"$.pressure"},{"column":"BatteryLevel","path":"$.batteryLevel"},{"column":"Location","path":"$.location"}]'
+
+// Create materialized view for latest readings
+.create-or-alter materialized-view LatestReadings on table DeviceTelemetry {
+    DeviceTelemetry
+    | summarize arg_max(Timestamp, *) by DeviceId
+}

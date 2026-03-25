@@ -1,0 +1,139 @@
+# Multi-Environment with Policies & Secrets
+# Shows advanced configuration for enterprise teams
+
+bundle:
+  name: enterprise-analytics
+  version: "2.0.0"
+  description: "Enterprise analytics with strict governance policies"
+
+variables:
+  db_host:
+    description: "Source database hostname"
+    default: "localhost"
+  db_name:
+    description: "Source database name"
+    default: "analytics"
+  slack_webhook:
+    description: "Slack webhook for deploy notifications"
+    default: ""
+
+resources:
+  environments:
+    spark_env:
+      runtime: "1.3"
+      libraries:
+        - semantic-link-labs
+        - great-expectations
+
+  lakehouses:
+    raw_data:
+      description: "Raw ingested data from source systems"
+      enable_schemas: true
+      shortcuts:
+        - name: external_sales
+          target: "adls://datalake.dfs.core.windows.net/sales/current"
+          path: Tables
+        - name: partner_data
+          target: "s3://partner-bucket/shared-data"
+          path: Files
+
+  notebooks:
+    etl_pipeline:
+      path: ./notebooks/etl.py
+      description: "Main ETL pipeline"
+      environment: spark_env
+      default_lakehouse: raw_data
+      folder: ETL
+
+  pipelines:
+    nightly_refresh:
+      description: "Nightly data refresh"
+      schedule:
+        cron: "0 1 * * *"
+        timezone: America/New_York
+        enabled: true
+      activities:
+        - name: etl
+          notebook: etl_pipeline
+
+# Policies — enforced on validate
+policies:
+  require_description: true
+  naming_convention: snake_case
+  max_notebook_size_kb: 500
+  blocked_libraries:
+    - pandas<2.0
+
+# Notifications
+notifications:
+  on_success:
+    - type: slack
+      webhook: "${var.slack_webhook}"
+      message: "Deployed {bundle.name} v{bundle.version} to {target}"
+  on_failure:
+    - type: slack
+      webhook: "${var.slack_webhook}"
+      message: "FAILED: {bundle.name} deploy to {target}"
+
+# Security
+security:
+  roles:
+    - name: platform_team
+      entra_group: sg-platform-engineering
+      workspace_role: admin
+    - name: data_engineers
+      entra_group: sg-data-engineering
+      workspace_role: contributor
+    - name: analysts
+      entra_group: sg-business-analysts
+      workspace_role: viewer
+      onelake_roles:
+        - tables: ["*"]
+          permissions: [read]
+    - name: data_scientists
+      entra_group: sg-data-science
+      workspace_role: contributor
+      onelake_roles:
+        - tables: ["*"]
+          permissions: [read, write]
+
+# Targets
+targets:
+  dev:
+    default: true
+    workspace:
+      name: enterprise-analytics-dev
+      capacity_id: "${var.capacity_id}"
+    variables:
+      db_host: dev-db.database.windows.net
+      db_name: analytics_dev
+
+  staging:
+    workspace:
+      name: enterprise-analytics-staging
+      capacity_id: "${var.capacity_id}"
+    variables:
+      db_host: staging-db.database.windows.net
+      db_name: analytics_staging
+    post_deploy:
+      - run: etl_pipeline
+        expect: success
+        timeout: 600
+
+  prod:
+    workspace:
+      name: enterprise-analytics-prod
+      capacity_id: "${var.capacity_id}"
+    run_as:
+      service_principal: sp-fabric-prod
+    variables:
+      db_host: "${secret.PROD_DB_HOST}"
+      db_name: analytics_prod
+    deployment_strategy:
+      type: canary
+      canary_resources: [etl_pipeline]
+
+variables:
+  capacity_id:
+    description: "Fabric capacity GUID"
+    default: "REPLACE-WITH-YOUR-CAPACITY-GUID"

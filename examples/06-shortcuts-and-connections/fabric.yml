@@ -1,0 +1,56 @@
+# OneLake Shortcuts & External Connections
+# Shows how to reference external data sources
+
+bundle:
+  name: external-data-hub
+  version: "1.0.0"
+  description: "Hub for external data via shortcuts and connections"
+
+resources:
+  lakehouses:
+    data_hub:
+      description: "Central data hub with external shortcuts"
+      enable_schemas: true
+      shortcuts:
+        # Azure Data Lake shortcut
+        - name: azure_sales_data
+          target: "adls://contosodatalake/sales/2024"
+          path: Tables
+          connection_id: "${var.adls_connection_id}"
+
+        # Amazon S3 shortcut
+        - name: partner_feed
+          target: "s3://partner-data-bucket/daily-feed"
+          path: Files
+
+        # Cross-workspace shortcut
+        - name: shared_dimensions
+          target: "onelake://shared-workspace-id/shared-lakehouse-id/Tables/dim_customer"
+          path: Tables
+
+  notebooks:
+    combine_sources:
+      path: ./notebooks/combine.py
+      description: "Combine external data sources"
+      default_lakehouse: data_hub
+
+connections:
+  adls_source:
+    type: azure_data_lake
+    endpoint: "https://contosodatalake.dfs.core.windows.net"
+    auth_type: service_principal
+
+targets:
+  dev:
+    default: true
+    workspace:
+      name: external-data-hub-dev
+      capacity_id: "${var.capacity_id}"
+
+variables:
+  capacity_id:
+    description: "Fabric capacity GUID"
+    default: "REPLACE-WITH-YOUR-CAPACITY-GUID"
+  adls_connection_id:
+    description: "ADLS connection GUID for authenticated shortcuts"
+    default: ""

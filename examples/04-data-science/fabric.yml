@@ -1,0 +1,96 @@
+# Data Science Example
+# ML experiments, models, and Spark job definitions
+
+bundle:
+  name: ml-pipeline
+  version: "1.0.0"
+  description: "ML training pipeline with experiment tracking"
+
+resources:
+  environments:
+    ml_env:
+      runtime: "1.3"
+      libraries:
+        - scikit-learn
+        - mlflow
+        - xgboost
+        - pandas
+        - matplotlib
+
+  lakehouses:
+    feature_store:
+      description: "Feature store for ML training data"
+      enable_schemas: true
+
+  notebooks:
+    feature_engineering:
+      path: ./notebooks/feature_engineering.py
+      description: "Build features from raw data"
+      environment: ml_env
+      default_lakehouse: feature_store
+
+    train_model:
+      path: ./notebooks/train_model.py
+      description: "Train and evaluate ML model with MLflow tracking"
+      environment: ml_env
+      default_lakehouse: feature_store
+      parameters:
+        model_type: xgboost
+        n_estimators: "100"
+        learning_rate: "0.1"
+
+    batch_inference:
+      path: ./notebooks/batch_inference.py
+      description: "Run batch predictions on new data"
+      environment: ml_env
+      default_lakehouse: feature_store
+
+  ml_experiments:
+    churn_prediction:
+      description: "Customer churn prediction experiment"
+
+  pipelines:
+    ml_training_pipeline:
+      description: "End-to-end ML training pipeline"
+      schedule:
+        cron: "0 2 * * 0"
+        timezone: UTC
+      activities:
+        - name: features
+          notebook: feature_engineering
+        - name: train
+          notebook: train_model
+          depends_on: [features]
+
+    daily_inference:
+      description: "Daily batch scoring"
+      schedule:
+        cron: "0 8 * * *"
+        timezone: UTC
+      activities:
+        - name: score
+          notebook: batch_inference
+
+  spark_job_definitions:
+    distributed_training:
+      path: ./spark_jobs/distributed_train.py
+      description: "Distributed model training job"
+      environment: ml_env
+      default_lakehouse: feature_store
+      args: ["--epochs", "10", "--batch-size", "256"]
+
+targets:
+  dev:
+    default: true
+    workspace:
+      name: ml-pipeline-dev
+      capacity_id: "${var.capacity_id}"
+  prod:
+    workspace:
+      name: ml-pipeline-prod
+      capacity_id: "${var.capacity_id}"
+
+variables:
+  capacity_id:
+    description: "Fabric capacity GUID"
+    default: "REPLACE-WITH-YOUR-CAPACITY-GUID"

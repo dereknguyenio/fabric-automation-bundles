@@ -983,6 +983,22 @@ class Deployer:
                         self.console.print(f"  [yellow]Warning:[/yellow] Parent eventhouse '{kdb.parent_eventhouse}' not found for KQL database '{item.resource_key}'")
                         return False
 
+            # Digital Twin Builder Flows need parent to be provisioned first
+            if item.resource_type == "DigitalTwinBuilderFlow" and resource_type_name:
+                dtbf = self.bundle.resources.digital_twin_builder_flows.get(item.resource_key)
+                if dtbf and dtbf.twin_builder:
+                    # Wait for parent to provision (up to 60s)
+                    for _wait in range(12):
+                        all_items = self.client.list_items(workspace_id)
+                        found = any(
+                            i.get("displayName") == dtbf.twin_builder and i.get("type") == "DigitalTwinBuilder"
+                            for i in all_items
+                        )
+                        if found:
+                            break
+                        self.console.print(f"  [dim]Waiting for twin builder '{dtbf.twin_builder}'...[/dim]")
+                        time.sleep(5)
+
             # For reports: try to auto-detect schema version from existing reports
             if item.resource_type == "Report" and definition:
                 detected_version = self._detect_report_schema_version(workspace_id)

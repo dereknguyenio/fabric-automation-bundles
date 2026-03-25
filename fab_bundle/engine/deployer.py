@@ -29,6 +29,7 @@ class DeployResult:
     items_created: int = 0
     items_updated: int = 0
     items_deleted: int = 0
+    items_skipped: int = 0
     items_failed: int = 0
     errors: list[str] = field(default_factory=list)
     item_ids: dict[str, str] = field(default_factory=dict)  # resource_key -> item_id
@@ -928,15 +929,15 @@ class Deployer:
         workspace_id: str,
         item: PlanItem,
         existing_items: dict[str, dict[str, Any]],
-    ) -> bool:
-        """Deploy a single item. Returns True on success."""
+    ) -> bool | None:
+        """Deploy a single item. Returns True on success, False on failure, None if skipped."""
         resource_type_name = self.bundle.resources.get_resource_type(item.resource_key)
         fabric_type = item.resource_type
 
         # Skip list-only types that cannot be created/updated/deleted via API
         if fabric_type in LIST_ONLY_TYPES:
             self.console.print(f"  [dim]-[/dim] {item.resource_key}: {fabric_type} is list-only (cannot be managed via API)")
-            return True
+            return None
 
         if item.action == PlanAction.CREATE:
             definition = self._get_item_definition(item.resource_key, item.resource_type)
@@ -949,7 +950,7 @@ class Deployer:
             # Warn if definition required but missing
             if fabric_type in DEFINITION_REQUIRED_TYPES and not definition:
                 self.console.print(f"  [yellow]Warning:[/yellow] {item.resource_key}: {fabric_type} requires a definition — skipping")
-                return True
+                return None
 
             if self.dry_run:
                 self.console.print(f"  [green]+[/green] Would create {item.resource_type}: {item.resource_key}")
@@ -961,6 +962,18 @@ class Deployer:
                 lh = self.bundle.resources.lakehouses.get(item.resource_key)
                 if lh and lh.enable_schemas:
                     creation_payload = {"enableSchemas": True}
+
+            # KQL databases require parent eventhouse ID
+            if item.resource_type == "KQLDatabase" and resource_type_name:
+                kdb = self.bundle.resources.kql_databases.get(item.resource_key)
+                if kdb and kdb.parent_eventhouse:
+                    items_map = self.client.get_workspace_items_map(workspace_id)
+                    parent_info = items_map.get(kdb.parent_eventhouse, {})
+                    if parent_info.get("id"):
+                        creation_payload = {"parentEventhouseItemId": parent_info["id"]}
+                    else:
+                        self.console.print(f"  [yellow]Warning:[/yellow] Parent eventhouse '{kdb.parent_eventhouse}' not found for KQL database '{item.resource_key}'")
+                        return False
 
             # For reports: try to auto-detect schema version from existing reports
             if item.resource_type == "Report" and definition:
@@ -1127,7 +1140,10 @@ class Deployer:
 
                 try:
                     success = self._deploy_item(workspace_id, item, existing_items)
-                    if success:
+                    if success is None:
+                        # Item was skipped (list-only, missing definition, etc.)
+                        result.items_skipped += 1
+                    elif success:
                         if item.action == PlanAction.CREATE:
                             result.items_created += 1
                         elif item.action == PlanAction.UPDATE:
@@ -1216,7 +1232,7 @@ class Deployer:
 
         self.console.print(
             f"  Created: {result.items_created}  Updated: {result.items_updated}  "
-            f"Deleted: {result.items_deleted}  Failed: {result.items_failed}"
+            f"Deleted: {result.items_deleted}  Skipped: {result.items_skipped}  Failed: {result.items_failed}"
         )
 
         # Release lock (always, even on error)

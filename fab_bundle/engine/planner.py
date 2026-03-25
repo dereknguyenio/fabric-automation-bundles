@@ -17,6 +17,7 @@ from rich.table import Table
 from fab_bundle.engine.resolver import ResourceNode, get_deployment_order
 from fab_bundle.engine.state import DeploymentState
 from fab_bundle.models.bundle import BundleDefinition
+from fab_bundle.providers.fabric_api import ITEM_TYPE_MAP
 
 
 class PlanAction(str, Enum):
@@ -216,26 +217,13 @@ def create_plan(
         return plan
 
     # Map Fabric item type names to our resource type names
-    fabric_type_map = {
-        "lakehouses": "Lakehouse",
-        "notebooks": "Notebook",
-        "pipelines": "DataPipeline",
-        "warehouses": "Warehouse",
-        "semantic_models": "SemanticModel",
-        "reports": "Report",
-        "data_agents": "DataAgent",
-        "environments": "Environment",
-        "eventhouses": "Eventhouse",
-        "eventstreams": "Eventstream",
-        "ml_models": "MLModel",
-        "ml_experiments": "MLExperiment",
-    }
+    # Uses the canonical ITEM_TYPE_MAP from fabric_api.py (field_name -> API type)
 
     # Track which workspace items are accounted for
     accounted_items: set[str] = set()
 
     for node in ordered_nodes:
-        fabric_type = fabric_type_map.get(node.resource_type, node.resource_type)
+        fabric_type = ITEM_TYPE_MAP.get(node.resource_type, node.resource_type)
 
         # Check if item exists in workspace
         existing = workspace_items.get(node.key)

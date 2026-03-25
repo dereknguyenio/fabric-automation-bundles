@@ -331,3 +331,143 @@ class TestDeploymentWaves:
             all_keys = [node.key for wave in waves for node in wave]
             assert "test_lakehouse" in all_keys
             assert "test_notebook" in all_keys
+
+
+class TestAllItemTypes:
+    """Verify every item type flows through plan → deploy without errors."""
+
+    def _make_all_types_bundle(self, tmpdir: Path) -> Path:
+        """Create a bundle with one resource of every deployable type."""
+        # Create dummy files referenced by resources
+        (tmpdir / "notebooks").mkdir(parents=True, exist_ok=True)
+        (tmpdir / "notebooks" / "test.py").write_text("# test")
+        (tmpdir / "defs").mkdir(parents=True, exist_ok=True)
+        (tmpdir / "defs" / "pipeline.json").write_text('{"properties":{}}')
+        (tmpdir / "defs" / "sjd.py").write_text("# spark job")
+        (tmpdir / "defs" / "schema.graphql").write_text("type Query { hello: String }")
+        (tmpdir / "defs" / "definition.json").write_text('{}')
+        (tmpdir / "defs" / "dag.py").write_text("# dag")
+        (tmpdir / "defs" / "sm").mkdir(parents=True, exist_ok=True)
+        (tmpdir / "defs" / "sm" / "model.tmdl").write_text("// model")
+        (tmpdir / "defs" / "report.pbir").write_text("{}")
+        (tmpdir / "defs" / "function.json").write_text("{}")
+        (tmpdir / "defs" / "mdf.json").write_text("{}")
+        (tmpdir / "defs" / "mdb.json").write_text("{}")
+
+        fabric_yml = {
+            "bundle": {"name": "all-types-test", "version": "0.1.0"},
+            "workspace": {"name": "test-workspace"},
+            "resources": {
+                # Types that create without definition
+                "lakehouses": {"test_lh": {"description": "test"}},
+                "warehouses": {"test_wh": {"description": "test"}},
+                "environments": {"test_env": {"runtime": "1.3", "description": "test"}},
+                "eventhouses": {"test_eh": {"description": "test"}},
+                "ml_models": {"test_mlm": {"path": "defs/definition.json", "description": "test"}},
+                "ml_experiments": {"test_mle": {"description": "test"}},
+                "variable_libraries": {"test_vl": {"description": "test"}},
+                "sql_databases": {"test_sqldb": {"description": "test"}},
+                "operations_agents": {"test_opsagent": {"description": "test"}},
+                # Types with definitions
+                "notebooks": {"test_nb": {"path": "./notebooks/test.py", "description": "test"}},
+                "pipelines": {"test_pipe": {"path": "./defs/pipeline.json", "description": "test"}},
+                "spark_job_definitions": {"test_sjd": {"path": "./defs/sjd.py", "description": "test"}},
+                "graphql_apis": {"test_gql": {"path": "./defs/schema.graphql", "description": "test"}},
+                "copy_jobs": {"test_cj": {"path": "./defs/definition.json", "description": "test"}},
+                "airflow_jobs": {"test_aj": {"path": "./defs/dag.py", "description": "test"}},
+                "reflex": {"test_rx": {"path": "./defs/definition.json", "description": "test"}},
+                "user_data_functions": {"test_udf": {"path": "./defs/function.json", "description": "test"}},
+                "eventstreams": {"test_es": {"path": "./defs/definition.json", "description": "test"}},
+                "kql_dashboards": {"test_kqld": {"path": "./defs/definition.json", "description": "test"}},
+                "kql_querysets": {"test_kqlq": {"path": "./defs/definition.json", "description": "test"}},
+                "ontologies": {"test_onto": {"path": "./defs/definition.json", "description": "test"}},
+                "graphs": {"test_graph": {"path": "./defs/definition.json", "description": "test"}},
+                "dbt_jobs": {"test_dbt": {"path": "./defs/definition.json", "description": "test"}},
+                "anomaly_detectors": {"test_ad": {"path": "./defs/definition.json", "description": "test"}},
+                "digital_twin_builders": {"test_dtb": {"path": "./defs/definition.json", "description": "test"}},
+                "digital_twin_builder_flows": {"test_dtbf": {"path": "./defs/definition.json", "description": "test"}},
+                "event_schema_sets": {"test_ess": {"path": "./defs/definition.json", "description": "test"}},
+                "graph_query_sets": {"test_gqs": {"path": "./defs/definition.json", "description": "test"}},
+                "map_items": {"test_map": {"path": "./defs/definition.json", "description": "test"}},
+                "graph_models": {"test_gm": {"path": "./defs/definition.json", "description": "test"}},
+                "hls_cohorts": {"test_hls": {"path": "./defs/definition.json", "description": "test"}},
+                "dataflows": {"test_df": {"path": "./defs/definition.json", "description": "test"}},
+                # Types that require definition (provide one so they don't skip)
+                "semantic_models": {"test_sm": {"path": "./defs/sm", "description": "test"}},
+                "reports": {"test_report": {"path": "./defs/report.pbir", "description": "test"}},
+                "mounted_data_factories": {"test_mdf": {"description": "test"}},
+                "mirrored_databases": {"test_mdb": {"description": "test"}},
+                # KQL database with parent eventhouse
+                "kql_databases": {"test_kqldb": {"parent_eventhouse": "test_eh", "description": "test"}},
+                # Types that depend on connections
+                "snowflake_databases": {"test_snow": {"description": "test"}},
+                "cosmosdb_databases": {"test_cosmos": {"description": "test"}},
+                "mirrored_databricks_catalogs": {"test_mdc": {"description": "test"}},
+                # Data agents
+                "data_agents": {"test_da": {"description": "test"}},
+                # List-only types (should be auto-skipped)
+                "datamarts": {"test_dm": {"description": "test"}},
+                "dashboards": {"test_dash": {"description": "test"}},
+                "paginated_reports": {"test_pr": {"description": "test"}},
+                "mirrored_warehouses": {"test_mw": {"description": "test"}},
+            },
+            "targets": {
+                "dev": {"default": True, "workspace": {"name": "test-dev"}},
+            },
+        }
+
+        (tmpdir / "fabric.yml").write_text(yaml.dump(fabric_yml))
+        return tmpdir
+
+    def test_all_types_plan_produces_correct_api_types(self):
+        """Every resource type should produce a valid Fabric API type name in the plan."""
+        from fab_bundle.providers.fabric_api import ITEM_TYPE_MAP
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_dir = self._make_all_types_bundle(Path(tmpdir))
+            bundle = load_bundle(str(project_dir / "fabric.yml"), "dev")
+
+            plan = create_plan(bundle, "dev", workspace_items={})
+
+            # All items should be CREATE actions
+            assert plan.has_changes
+            assert not plan.errors
+
+            # Every plan item's resource_type should be a proper API type name
+            # (capitalized, not a field name like "kql_databases")
+            valid_api_types = set(ITEM_TYPE_MAP.values())
+            for item in plan.items:
+                assert item.resource_type in valid_api_types, (
+                    f"Plan item '{item.resource_key}' has raw field name "
+                    f"'{item.resource_type}' instead of an API type name"
+                )
+
+    def test_all_types_deploy_with_mock(self):
+        """Every resource type should deploy without errors using a mocked API."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_dir = self._make_all_types_bundle(Path(tmpdir))
+            bundle = load_bundle(str(project_dir / "fabric.yml"), "dev")
+
+            client = _mock_client()
+            # Return eventhouse in workspace items so KQL database can find parent
+            client.get_workspace_items_map.return_value = {
+                "test_eh": {"id": "eh-001", "type": "Eventhouse"},
+            }
+
+            plan = create_plan(bundle, "dev", workspace_items={})
+            assert not plan.errors
+
+            deployer = Deployer(client, bundle, project_dir)
+            result = deployer.execute(plan, "dev")
+
+            assert result.success, f"Deploy failed with errors: {result.errors}"
+            assert result.items_failed == 0, f"Failed items: {result.errors}"
+            # List-only types (4) should be skipped, definition-required without
+            # definition (2: MountedDataFactory, MirroredDatabase) should be skipped
+            # All others should be created
+            total_resources = len(plan.items)
+            skipped = 4 + 2  # list-only + definition-required without definition
+            assert result.items_created == total_resources - skipped, (
+                f"Expected {total_resources - skipped} creates, got {result.items_created}. "
+                f"Errors: {result.errors}"
+            )

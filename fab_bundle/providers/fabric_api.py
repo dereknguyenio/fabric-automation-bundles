@@ -171,9 +171,22 @@ class FabricClient:
 
                 if resp.status_code >= 400:
                     error_body = resp.json() if resp.text else {}
+                    # Handle both {error: {message}} and {message} formats
+                    msg = (
+                        error_body.get("message")
+                        or error_body.get("error", {}).get("message")
+                        or resp.text
+                    )
+                    # Check if retriable
+                    is_retriable = error_body.get("isRetriable", False)
+                    if is_retriable and attempt < retry_count - 1:
+                        wait = min(30, 5 * (attempt + 1))
+                        time.sleep(wait)
+                        continue
+
                     raise FabricApiError(
                         status_code=resp.status_code,
-                        message=error_body.get("error", {}).get("message", resp.text),
+                        message=msg,
                         request_id=resp.headers.get("x-ms-request-id"),
                     )
 
@@ -471,14 +484,20 @@ class FabricClient:
         return result
 
     def publish_environment(self, workspace_id: str, item_id: str) -> dict[str, Any] | None:
-        """Publish a Spark environment (installs libraries)."""
-        result = self._request(
-            "POST",
-            f"/workspaces/{workspace_id}/environments/{item_id}/staging/publish",
-        )
-        if result and "operation_url" in result:
-            return self._wait_for_operation(result["operation_url"], timeout=600)
-        return result
+        """Publish a Spark environment (installs libraries). Uses GA API with beta=False."""
+        url = f"{FABRIC_API_BASE}/workspaces/{workspace_id}/environments/{item_id}/staging/publish"
+        params = {"beta": "False"}
+        resp = self._session.post(url, headers=self._headers, params=params, timeout=60)
+
+        if resp.status_code == 202:
+            # LRO — poll for completion
+            operation_url = resp.headers.get("Location", "")
+            if operation_url:
+                return self._wait_for_operation(operation_url, timeout=600)
+            return {"status": "accepted"}
+        elif resp.status_code == 200:
+            return resp.json() if resp.text else {"status": "success"}
+        return None
 
     def update_environment_libraries(
         self,
@@ -486,14 +505,29 @@ class FabricClient:
         item_id: str,
         libraries: list[str],
     ) -> dict[str, Any] | None:
-        """Update the library list for a Spark environment staging area."""
-        # Build pypi library config
-        pypi_libs = [{"name": lib} for lib in libraries]
-        return self._request(
-            "POST",
-            f"/workspaces/{workspace_id}/environments/{item_id}/staging/libraries",
-            data={"pypiLibraries": pypi_libs},
+        """Upload PyPI libraries via environment.yml to the staging area."""
+        # Build environment.yml content
+        yml_lines = ["name: fabric-env", "dependencies:"]
+        for lib in libraries:
+            yml_lines.append(f"  - {lib}")
+        yml_content = "\n".join(yml_lines).encode("utf-8")
+
+        url = (
+            f"{FABRIC_API_BASE}/workspaces/{workspace_id}/environments/{item_id}"
+            f"/staging/libraries/importExternalLibraries"
         )
+        headers = {
+            "Authorization": f"Bearer {self.auth.get_token()}",
+            "Content-Type": "application/octet-stream",
+        }
+        resp = self._session.post(url, headers=headers, data=yml_content, timeout=60)
+
+        if resp.status_code in (200, 202):
+            return {"status": "uploaded"}
+        elif resp.status_code >= 400:
+            error_msg = resp.text[:500] if resp.text else f"HTTP {resp.status_code}"
+            raise Exception(f"Environment library upload failed: {error_msg}")
+        return None
 
     # -----------------------------------------------------------------------
     # Workspace tagging

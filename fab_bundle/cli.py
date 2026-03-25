@@ -233,7 +233,8 @@ def plan(bundle_file: str | None, target: str | None, auto_delete: bool, validat
 @click.option("--dry-run", is_flag=True, default=False, help="Preview without deploying")
 @click.option("--auto-approve", "-y", is_flag=True, default=False, help="Skip confirmation")
 @click.option("--auto-delete/--no-auto-delete", default=False, help="Delete unmanaged items")
-def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_approve: bool, auto_delete: bool):
+@click.option("--force", is_flag=True, default=False, help="Override deployment lock and skip cache")
+def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_approve: bool, auto_delete: bool, force: bool):
     """Deploy the bundle to a target workspace."""
     from fab_bundle.engine.deployer import Deployer
     from fab_bundle.engine.loader import BundleLoadError, load_bundle
@@ -291,7 +292,7 @@ def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_appr
     # Deploy
     deployer = Deployer(client, bundle, project_dir, console, dry_run=dry_run)
     deployer.state_manager = state_mgr
-    result = deployer.execute(deployment_plan, target)
+    result = deployer.execute(deployment_plan, target, force=force)
 
     if not result.success:
         sys.exit(1)

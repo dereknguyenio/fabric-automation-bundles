@@ -1129,8 +1129,11 @@ class Deployer:
             f"Deleted: {result.items_deleted}  Failed: {result.items_failed}"
         )
 
-        # Release lock
-        if self.state_manager and not self.dry_run:
-            self.state_manager.release_lock()
+        # Release lock (always, even on error)
+        try:
+            if self.state_manager and not self.dry_run:
+                self.state_manager.release_lock()
+        except Exception:
+            pass
 
         return result

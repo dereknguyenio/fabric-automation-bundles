@@ -141,9 +141,9 @@ fab-bundle destroy --target dev       # Tear down dev environment
 
 ### Try the CI/CD Pipeline
 
-[![Use this template](https://img.shields.io/badge/Use_this_template-238636?style=for-the-badge&logo=github)](https://github.com/dereknguyenio/fabric-fab-cicd-example/generate)
+[![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-Use_Template-238636?style=for-the-badge&logo=github)](https://github.com/dereknguyenio/fabric-fab-cicd-example/generate) [![Azure DevOps](https://img.shields.io/badge/Azure_DevOps-Use_Template-0078D7?style=for-the-badge&logo=azuredevops)](https://github.com/dereknguyenio/fabric-fab-cicd-ado-example/generate)
 
-Click above to create your own repo with a working dev → test → prod pipeline. Just add 5 secrets and push. [Setup guide →](https://github.com/dereknguyenio/fabric-fab-cicd-example#setup)
+Click to create your own repo with a working dev → test → prod pipeline. Add 5 secrets and push. Setup guides: [GitHub Actions](https://github.com/dereknguyenio/fabric-fab-cicd-example#setup) | [Azure DevOps](https://github.com/dereknguyenio/fabric-fab-cicd-ado-example#setup)
 
 ### Use with GitHub Copilot or Claude Code (MCP)
 

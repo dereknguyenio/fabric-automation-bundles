@@ -340,21 +340,163 @@ git push  # CI/CD deploys to test → prod
 
 ---
 
+## Pattern 5: MCP-Driven Development (Conversational)
+
+Best for: Developers using Claude Code, Cursor, or Windsurf who want to manage Fabric entirely through conversation.
+
+With the fab-bundle MCP server + [Microsoft Fabric MCP Server](https://github.com/microsoft/mcp), you can scaffold, deploy, run, and monitor Fabric projects without typing CLI commands.
+
+```
+┌─────────────────────────────────────────────────┐
+│ Claude Code / Cursor / Windsurf                 │
+│                                                 │
+│  MCP Servers:                                   │
+│    fab-bundle-mcp  → deploy, plan, status, run  │
+│    fabric-mcp      → API docs, item definitions │
+│                                                 │
+│  Developer talks to AI:                         │
+│    "Create a medallion project for sales data"  │
+│    "Deploy to dev"                              │
+│    "Run the ingest notebook"                    │
+│    "Check for drift in prod"                    │
+│    "What capacities do I have?"                 │
+│    "Show me what's deployed in test"            │
+│    "Destroy the dev environment"                │
+└─────────────────────────────────────────────────┘
+```
+
+### Setup
+
+```bash
+# 1. Install fab-bundle with MCP support
+pip install fabric-automation-bundles[mcp]
+
+# 2. Authenticate
+az login
+
+# 3. Add MCP servers to your IDE
+
+# Claude Code — add to .claude/settings.json:
+{
+  "mcpServers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    }
+  }
+}
+
+# Optional: also add Microsoft's Fabric MCP for API docs context
+# See: https://github.com/microsoft/mcp
+```
+
+### Example conversation
+
+```
+You: "Set up a new Fabric project for our sales analytics"
+
+Claude: I'll create a medallion lakehouse project.
+        [calls fab_list_capacities → finds your F8 capacity]
+        [calls fab_validate → checks the bundle]
+        [writes fabric.yml with bronze/silver/gold + ETL notebooks]
+
+You: "Deploy it to dev"
+
+Claude: Let me plan the deployment first.
+        [calls fab_plan → shows 12 resources to create]
+        Here's what will be created:
+          3 lakehouses, 3 notebooks, 2 pipelines, 1 warehouse...
+        Should I proceed?
+
+You: "Yes"
+
+Claude: [calls fab_deploy → creates all resources]
+        Deployed 12 resources to sales-analytics-dev.
+
+You: "Run the ingest notebook"
+
+Claude: [calls fab_run → submits notebook job]
+        Job submitted. Check the Fabric portal for results.
+
+You: "What's the status?"
+
+Claude: [calls fab_status → shows all deployed items]
+        12 items deployed, no drift detected.
+        Last deploy: 2 minutes ago.
+
+You: "Someone changed something in the portal, check for drift"
+
+Claude: [calls fab_drift → compares bundle vs workspace]
+        Drift detected: 1 item added (manual_report) not in fabric.yml.
+
+You: "Deploy to prod"
+
+Claude: [calls fab_plan for prod → shows what would change]
+        This will create a new workspace 'sales-analytics-prod'
+        with 12 resources. Proceed?
+
+You: "Yes, deploy it"
+
+Claude: [calls fab_deploy -t prod]
+        Deployed 12 resources to sales-analytics-prod.
+```
+
+### Two MCP servers, two purposes
+
+| MCP Server | What it does | Install |
+|------------|-------------|---------|
+| **fab-bundle-mcp** | Deploy, plan, status, run, drift, destroy — manages your Fabric project | `pip install fabric-automation-bundles[mcp]` |
+| **[Microsoft Fabric MCP](https://github.com/microsoft/mcp)** | Fabric API docs, item definitions, best practices — gives AI context about Fabric | VS Code extension or npm |
+
+Use them together: Microsoft's MCP gives the AI knowledge about Fabric APIs, fab-bundle MCP gives it the ability to act on your workspace.
+
+### Available fab-bundle MCP tools
+
+| Tool | What you'd say |
+|------|---------------|
+| `fab_validate` | "Check if my fabric.yml is valid" |
+| `fab_plan` | "What would change if I deploy to test?" |
+| `fab_deploy` | "Deploy to dev" |
+| `fab_destroy` | "Tear down the test environment" |
+| `fab_status` | "What's deployed in prod?" |
+| `fab_drift` | "Check for drift in staging" |
+| `fab_run` | "Run the ETL pipeline in dev" |
+| `fab_history` | "Show me recent deployments" |
+| `fab_doctor` | "Is my Fabric setup working?" |
+| `fab_list_templates` | "What templates are available?" |
+| `fab_list_workspaces` | "Show me all my workspaces" |
+| `fab_list_capacities` | "What capacities do I have?" |
+
+### Limitations
+
+- MCP tools can't edit notebook content (use Fabric VS Code Extension for that)
+- Deploy operations require Azure auth (`az login` or service principal env vars)
+- fab-bundle MCP server is in beta
+
+### When to use
+
+- You already use Claude Code, Cursor, or Windsurf
+- You prefer conversational development over CLI commands
+- Quick operations: "deploy to dev", "check drift", "what's deployed"
+- Demos and onboarding — show new team members how Fabric works
+
+---
+
 ## Comparison
 
-| | Write Local | Portal + Export | Git Sync + fab-bundle | VS Code + Fabric Extension |
-|---|---|---|---|---|
-| **Notebook editing** | VS Code (no Spark) | Fabric portal | Fabric portal | VS Code (with Spark) |
-| **Testing** | Deploy first, then portal | Run in portal | Run in portal | Run from VS Code |
-| **AI assistance** | Claude Code / Copilot | Fabric Copilot | Fabric Copilot | Claude Code + Copilot + Fabric AI Agent |
-| **Git integration** | Manual commit | Manual export | Auto-sync | Manual commit |
-| **Infrastructure** | fabric.yml | fabric.yml (generated) | fabric.yml | fabric.yml |
-| **Best for** | Simple projects | Existing workspaces | Enterprise | AI-first development |
-| **Complexity** | Low | Medium | Medium-High | Medium |
+| | Write Local | Portal + Export | Git Sync | VS Code + Fabric Ext | MCP-Driven |
+|---|---|---|---|---|---|
+| **Notebook editing** | VS Code (no Spark) | Fabric portal | Fabric portal | VS Code (with Spark) | AI writes code |
+| **Testing** | Deploy, then portal | Run in portal | Run in portal | Run from VS Code | "Run the notebook" |
+| **AI assistance** | Claude / Copilot | Fabric Copilot | Fabric Copilot | Claude + Copilot | Full conversation |
+| **Infrastructure** | fabric.yml | generated | fabric.yml | fabric.yml | AI creates it |
+| **Deploy** | `fab-bundle deploy` | `fab-bundle deploy` | `fab-bundle deploy` | `fab-bundle deploy` | "Deploy to dev" |
+| **Best for** | Code-first | Existing workspaces | Enterprise | AI + Spark | Conversational |
+| **Complexity** | Low | Medium | Medium-High | Medium | Low |
 
 ## Recommended Starting Point
 
 1. **New project?** → Pattern 1 (Write Local). Run `fab-bundle init` and start coding.
 2. **Existing workspace?** → Pattern 2 (Portal + Export). Run `fab-bundle generate` to capture what you have.
 3. **Enterprise with git sync?** → Pattern 3. Use git sync for notebooks, fab-bundle for everything else.
-4. **Want AI + real Spark in VS Code?** → Pattern 4. Install the Fabric VS Code Extension + Claude Code/Copilot + fab-bundle MCP server.
+4. **Want AI + real Spark in VS Code?** → Pattern 4. Install the Fabric VS Code Extension + Claude Code/Copilot.
+5. **Want to talk to your infrastructure?** → Pattern 5. Add fab-bundle MCP server to Claude Code/Cursor.

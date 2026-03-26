@@ -6,7 +6,7 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/dereknguyenio/fabric-automation-bundles/ci.yml?label=tests)](https://github.com/dereknguyenio/fabric-automation-bundles/actions)
 [![Docs](https://img.shields.io/badge/docs-live-teal)](https://dereknguyenio.github.io/fabric-automation-bundles/)
 
-> **v1.0.0-beta** — 30 item types verified against live Fabric API. Production-ready for core workflows. [See what's tested.](#tested-item-types)
+> **Public Preview** — 30 item types verified against live Fabric API. Core workflows are production-ready. [See what's tested.](#tested-item-types)
 
 **Declarative project definitions for Microsoft Fabric.**
 

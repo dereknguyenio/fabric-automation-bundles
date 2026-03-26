@@ -114,6 +114,9 @@ def _substitute_variables(obj: Any, variables: dict[str, str]) -> Any:
                     if var_name in variables:
                         return variables[var_name]
                     return match.group(0)  # Leave unresolved
+            # Handle env., secret., bundle. — look up full expression in variables dict
+            if expr in variables:
+                return variables[expr]
             return match.group(0)
 
         return re.sub(r"\$\{([^}]+)\}", _replace, obj)

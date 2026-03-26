@@ -126,14 +126,14 @@ jobs:
         run: pip install fabric-automation-bundles
 
       - name: Deploy
-        run: fab-bundle deploy -t dev -y
+        run: fab-bundle deploy --target dev -y
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Verify deployment
-        run: fab-bundle status -t dev
+        run: fab-bundle status --target dev
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -156,14 +156,14 @@ jobs:
         run: pip install fabric-automation-bundles
 
       - name: Deploy
-        run: fab-bundle deploy -t staging -y
+        run: fab-bundle deploy --target staging -y
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Verify deployment
-        run: fab-bundle status -t staging
+        run: fab-bundle status --target staging
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -186,14 +186,14 @@ jobs:
         run: pip install fabric-automation-bundles
 
       - name: Deploy
-        run: fab-bundle deploy -t prod -y
+        run: fab-bundle deploy --target prod -y
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Verify deployment
-        run: fab-bundle status -t prod
+        run: fab-bundle status --target prod
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}

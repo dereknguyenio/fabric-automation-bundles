@@ -41,7 +41,7 @@ stages:
           - script: fab-bundle validate
             displayName: 'Validate fabric.yml'
 
-          - script: fab-bundle plan -t dev
+          - script: fab-bundle plan --target dev
             displayName: 'Plan dev deployment'
             env:
               AZURE_TENANT_ID: $(AZURE_TENANT_ID)
@@ -71,14 +71,14 @@ stages:
                 - script: pip install fabric-automation-bundles
                   displayName: 'Install fab-bundle'
 
-                - script: fab-bundle deploy -t dev -y
+                - script: fab-bundle deploy --target dev -y
                   displayName: 'Deploy to dev'
                   env:
                     AZURE_TENANT_ID: $(AZURE_TENANT_ID)
                     AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
                     AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
 
-                - script: fab-bundle status -t dev
+                - script: fab-bundle status --target dev
                   displayName: 'Check status'
                   env:
                     AZURE_TENANT_ID: $(AZURE_TENANT_ID)
@@ -107,7 +107,7 @@ stages:
                 - script: pip install fabric-automation-bundles
                   displayName: 'Install fab-bundle'
 
-                - script: fab-bundle deploy -t test -y
+                - script: fab-bundle deploy --target test -y
                   displayName: 'Deploy to test'
                   env:
                     AZURE_TENANT_ID: $(AZURE_TENANT_ID)
@@ -136,14 +136,14 @@ stages:
                 - script: pip install fabric-automation-bundles
                   displayName: 'Install fab-bundle'
 
-                - script: fab-bundle deploy -t prod -y
+                - script: fab-bundle deploy --target prod -y
                   displayName: 'Deploy to production'
                   env:
                     AZURE_TENANT_ID: $(AZURE_TENANT_ID)
                     AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
                     AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
 
-                - script: fab-bundle status -t prod
+                - script: fab-bundle status --target prod
                   displayName: 'Verify deployment'
                   env:
                     AZURE_TENANT_ID: $(AZURE_TENANT_ID)

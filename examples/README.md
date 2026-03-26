@@ -9,8 +9,8 @@ Working examples you can copy and deploy to your Fabric tenant.
 3. Run:
    ```bash
    fab-bundle validate
-   fab-bundle plan -t dev
-   fab-bundle deploy -t dev
+   fab-bundle plan --target dev
+   fab-bundle deploy --target dev
    ```
 
 ## Examples

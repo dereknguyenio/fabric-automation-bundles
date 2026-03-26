@@ -170,7 +170,7 @@ Bundle is valid.
 **Validate against a specific target:**
 
 ```bash
-fab-bundle validate -t prod
+fab-bundle validate --target prod
 ```
 
 **Example output (with target):**
@@ -253,7 +253,7 @@ Plan: sales-analytics → sales-analytics-dev
 **Plan with auto-delete to remove unmanaged items:**
 
 ```bash
-fab-bundle plan -t prod --auto-delete
+fab-bundle plan --target prod --auto-delete
 ```
 
 **Example output:**
@@ -344,19 +344,19 @@ Deploy complete. 3 items deployed in 12.4s.
 **Deploy to production with auto-approve (CI/CD):**
 
 ```bash
-fab-bundle deploy -t prod -y
+fab-bundle deploy --target prod -y
 ```
 
 **Dry run:**
 
 ```bash
-fab-bundle deploy -t staging --dry-run
+fab-bundle deploy --target staging --dry-run
 ```
 
 **Force deploy (skip lock and cache):**
 
 ```bash
-fab-bundle deploy -t dev --force --auto-approve
+fab-bundle deploy --target dev --force --auto-approve
 ```
 
 > **Warning**
@@ -393,7 +393,7 @@ fab-bundle destroy [OPTIONS]
 **Destroy resources in the dev environment:**
 
 ```bash
-fab-bundle destroy -t dev
+fab-bundle destroy --target dev
 ```
 
 **Example output:**
@@ -426,7 +426,7 @@ Destroy complete. Deleted: 6 resources.
 **Destroy with auto-approve and delete workspace (CI/CD cleanup):**
 
 ```bash
-fab-bundle destroy -t dev -y --delete-workspace
+fab-bundle destroy --target dev -y --delete-workspace
 ```
 
 > **Warning**
@@ -468,7 +468,7 @@ fab-bundle run RESOURCE_NAME [OPTIONS]
 **Run a notebook:**
 
 ```bash
-fab-bundle run ingest_notebook -t dev
+fab-bundle run ingest_notebook --target dev
 ```
 
 **Example output:**
@@ -485,7 +485,7 @@ Run complete.
 **Run a notebook with parameters:**
 
 ```bash
-fab-bundle run ingest_notebook -t dev -p start_date=2025-01-01 -p end_date=2025-12-31
+fab-bundle run ingest_notebook --target dev -p start_date=2025-01-01 -p end_date=2025-12-31
 ```
 
 **Example output:**
@@ -503,7 +503,7 @@ Run complete.
 **Run a pipeline:**
 
 ```bash
-fab-bundle run daily_pipeline -t prod
+fab-bundle run daily_pipeline --target prod
 ```
 
 > **Note**
@@ -536,7 +536,7 @@ fab-bundle status [OPTIONS]
 ### Examples
 
 ```bash
-fab-bundle status -t dev
+fab-bundle status --target dev
 ```
 
 **Example output:**
@@ -592,7 +592,7 @@ fab-bundle drift [OPTIONS]
 ### Examples
 
 ```bash
-fab-bundle drift -t dev
+fab-bundle drift --target dev
 ```
 
 **Example output (drift detected):**
@@ -646,7 +646,7 @@ fab-bundle diff [OPTIONS] [RESOURCE_NAME]
 **Diff all resources:**
 
 ```bash
-fab-bundle diff -t dev
+fab-bundle diff --target dev
 ```
 
 **Example output:**
@@ -664,7 +664,7 @@ fab-bundle diff -t dev
 **Diff a single resource:**
 
 ```bash
-fab-bundle diff -t dev ingest_notebook
+fab-bundle diff --target dev ingest_notebook
 ```
 
 **Example output (no differences):**
@@ -700,7 +700,7 @@ fab-bundle history [OPTIONS]
 ### Examples
 
 ```bash
-fab-bundle history -t prod
+fab-bundle history --target prod
 ```
 
 **Example output:**
@@ -716,7 +716,7 @@ Deployment History (prod):
 **Show only the last 5 entries:**
 
 ```bash
-fab-bundle history -t prod -n 5
+fab-bundle history --target prod -n 5
 ```
 
 **Example output (no history):**
@@ -752,7 +752,7 @@ fab-bundle rollback [OPTIONS]
 **Roll back to the previous deployment:**
 
 ```bash
-fab-bundle rollback -t prod --last
+fab-bundle rollback --target prod --last
 ```
 
 **Example output:**
@@ -769,7 +769,7 @@ State rolled back. Run 'fab-bundle deploy' to apply.
 **Roll back to a specific deployment:**
 
 ```bash
-fab-bundle rollback -t prod --to deploy-ghi789 -y
+fab-bundle rollback --target prod --to deploy-ghi789 -y
 ```
 
 > **Important**
@@ -863,7 +863,7 @@ fab-bundle export [OPTIONS]
 **Export all items from the dev workspace:**
 
 ```bash
-fab-bundle export -t dev -o ./exported
+fab-bundle export --target dev -o ./exported
 ```
 
 **Example output:**
@@ -883,7 +883,7 @@ Exported 3 item(s) to /Users/you/project/exported
 **Export a single resource:**
 
 ```bash
-fab-bundle export -t dev -r ingest_notebook -o ./exported
+fab-bundle export --target dev -r ingest_notebook -o ./exported
 ```
 
 ---
@@ -1019,7 +1019,7 @@ fab-bundle import [OPTIONS]
 **Import from Terraform state:**
 
 ```bash
-fab-bundle import --from-terraform ./terraform.tfstate -t prod
+fab-bundle import --from-terraform ./terraform.tfstate --target prod
 ```
 
 **Example output:**
@@ -1037,7 +1037,7 @@ Imported 4 resources to fab-bundle state.
 **Import from a live workspace:**
 
 ```bash
-fab-bundle import -w "My Workspace" -t dev
+fab-bundle import -w "My Workspace" --target dev
 ```
 
 **Example output:**
@@ -1227,7 +1227,7 @@ fab-bundle watch [OPTIONS]
 **Watch and auto-deploy to dev:**
 
 ```bash
-fab-bundle watch -t dev
+fab-bundle watch --target dev
 ```
 
 **Example output:**
@@ -1246,7 +1246,7 @@ Watching for changes... (target: dev, interval: 5s)
 **Watch with a faster interval:**
 
 ```bash
-fab-bundle watch -t dev --interval 2
+fab-bundle watch --target dev --interval 2
 ```
 
 ### Watched file types

@@ -150,19 +150,19 @@ Locks automatically expire after 30 minutes (stale lock protection).
 
 ```bash
 # View current state
-fab-bundle status -t dev
+fab-bundle status --target dev
 
 # View deployment history
-fab-bundle history -t dev
+fab-bundle history --target dev
 
 # Detect drift (compare state vs live workspace)
-fab-bundle drift -t dev
+fab-bundle drift --target dev
 
 # Rollback to previous deployment
-fab-bundle rollback --last -t dev
+fab-bundle rollback --last --target dev
 
 # Override a stale lock
-fab-bundle deploy -t dev --force
+fab-bundle deploy --target dev --force
 ```
 
 ## Importing Existing Resources
@@ -171,10 +171,10 @@ If you have resources already deployed (by Terraform, fabric-cicd, or manually),
 
 ```bash
 # From a live workspace
-fab-bundle import --workspace "my-existing-workspace" -t dev
+fab-bundle import --workspace "my-existing-workspace" --target dev
 
 # From Terraform state
-fab-bundle import --from-terraform terraform.tfstate -t dev
+fab-bundle import --from-terraform terraform.tfstate --target dev
 ```
 
 This creates the state file without redeploying — fab-bundle will manage the resources going forward.

@@ -4,7 +4,7 @@ Targets and variables are how fab-bundle manages environment-specific configurat
 
 ## What targets are
 
-A target is a named deployment environment. Each target maps to a specific Fabric workspace and can override variables, authentication, post-deployment checks, and deployment strategy. When you run `fab-bundle deploy -t prod`, fab-bundle reads the `prod` target configuration and deploys to the workspace defined there.
+A target is a named deployment environment. Each target maps to a specific Fabric workspace and can override variables, authentication, post-deployment checks, and deployment strategy. When you run `fab-bundle deploy --target prod`, fab-bundle reads the `prod` target configuration and deploys to the workspace defined there.
 
 ```yaml
 targets:
@@ -36,7 +36,7 @@ Exactly one target should have `default: true`. This is the target used when you
 fab-bundle deploy
 
 # Explicitly specify a target
-fab-bundle deploy -t prod
+fab-bundle deploy --target prod
 ```
 
 If no default is set and no `-t` flag is provided, fab-bundle will prompt you to select a target.

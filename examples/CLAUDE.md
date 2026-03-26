@@ -28,7 +28,7 @@ If configured, you have access to these tools via the `fab-bundle-mcp` MCP serve
 
 ## Common Tasks
 
-- **Deploy to dev:** Use `fab_deploy` with `target: "dev"` or run `fab-bundle deploy -t dev`
+- **Deploy to dev:** Use `fab_deploy` with `target: "dev"` or run `fab-bundle deploy --target dev`
 - **Check what's deployed:** Use `fab_status` with `target: "dev"`
 - **Preview changes:** Use `fab_plan` with `target: "dev"`
 - **Run a notebook:** Use `fab_run` with `resource_name: "notebook_name"` and `target: "dev"`

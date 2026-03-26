@@ -38,11 +38,11 @@ flowchart LR
 | Stage | Command | Trigger | Authentication Required | Purpose |
 |-------|---------|---------|------------------------|---------|
 | Validate | `fab-bundle validate --strict` | PR opened/updated | No | Schema and policy checks against local files |
-| Plan | `fab-bundle plan -t dev` | PR opened/updated | Yes | Dry-run diff against the live workspace |
-| Deploy Dev | `fab-bundle deploy -t dev -y` | Merge to main | Yes | Deploy to the development workspace |
-| Deploy Staging | `fab-bundle deploy -t staging -y` | After dev succeeds | Yes | Deploy to the staging workspace |
-| Deploy Prod | `fab-bundle deploy -t prod -y` | After manual approval | Yes | Deploy to the production workspace |
-| Drift Check | `fab-bundle drift -t prod` | Scheduled (cron) | Yes | Detect out-of-band changes |
+| Plan | `fab-bundle plan --target dev` | PR opened/updated | Yes | Dry-run diff against the live workspace |
+| Deploy Dev | `fab-bundle deploy --target dev -y` | Merge to main | Yes | Deploy to the development workspace |
+| Deploy Staging | `fab-bundle deploy --target staging -y` | After dev succeeds | Yes | Deploy to the staging workspace |
+| Deploy Prod | `fab-bundle deploy --target prod -y` | After manual approval | Yes | Deploy to the production workspace |
+| Drift Check | `fab-bundle drift --target prod` | Scheduled (cron) | Yes | Detect out-of-band changes |
 
 ## Authentication in CI/CD
 

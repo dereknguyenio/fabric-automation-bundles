@@ -30,7 +30,7 @@ export DB_USERNAME="svc_fabric"
 export DB_PASSWORD="correct-horse-battery-staple"
 export API_KEY="sk-abc123..."
 
-fab-bundle deploy -t prod -y
+fab-bundle deploy --target prod -y
 ```
 
 If a referenced secret is missing from the environment, fab-bundle will fail with a clear error before making any API calls:
@@ -99,7 +99,7 @@ Store secrets in your repository settings (**Settings > Secrets and variables > 
 
 ```yaml
 - name: Deploy to production
-  run: fab-bundle deploy -t prod -y
+  run: fab-bundle deploy --target prod -y
   env:
     AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -124,7 +124,7 @@ variables:
   - group: fabric-secrets  # Contains DB_HOST, DB_PASSWORD, etc.
 
 steps:
-  - script: fab-bundle deploy -t prod -y
+  - script: fab-bundle deploy --target prod -y
     displayName: 'Deploy to production'
     env:
       AZURE_TENANT_ID: $(AZURE_TENANT_ID)

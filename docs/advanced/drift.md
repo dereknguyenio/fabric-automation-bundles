@@ -37,13 +37,13 @@ Items that exist in both the state and the workspace, but whose definition has c
 fab-bundle drift
 
 # Check drift against a specific target
-fab-bundle drift -t prod
+fab-bundle drift --target prod
 ```
 
 ### Example output
 
 ```
-$ fab-bundle drift -t dev
+$ fab-bundle drift --target dev
 
 Drift Report for target: dev
 Workspace: contoso-analytics-dev (c2410443-5bce-4cce-8065-b453dd6b2f1d)
@@ -69,7 +69,7 @@ Summary: 4 resources drifted (2 added, 1 removed, 1 modified)
 Use `--format json` to produce output suitable for scripts and CI/CD:
 
 ```bash
-fab-bundle drift -t dev --format json
+fab-bundle drift --target dev --format json
 ```
 
 ```json
@@ -163,7 +163,7 @@ Once drift is detected, you have two options depending on which version of the t
 If the bundle definition is correct and the workspace should match it, redeploy:
 
 ```bash
-fab-bundle deploy -t dev -y
+fab-bundle deploy --target dev -y
 ```
 
 This pushes the bundle definitions to the workspace, overwriting any manual changes. Added items that are not in the bundle are left untouched (fab-bundle only manages resources it tracks).
@@ -174,16 +174,16 @@ If the changes made in the workspace are intentional and should be preserved, up
 
 ```bash
 # Export the current workspace definitions to local files
-fab-bundle export -t dev
+fab-bundle export --target dev
 
 # Review the exported changes, update fabric.yml as needed, then redeploy
-fab-bundle deploy -t dev -y
+fab-bundle deploy --target dev -y
 ```
 
 For items that were added outside the bundle and should now be managed, use `fab-bundle bind`:
 
 ```bash
-fab-bundle bind --item-id <item-guid> --resource-key new_notebook -t dev
+fab-bundle bind --item-id <item-guid> --resource-key new_notebook --target dev
 ```
 
 For items that were deleted from the workspace and should also be removed from the bundle, delete the resource entry from `fabric.yml` and redeploy.
@@ -194,7 +194,7 @@ Drift detection depends entirely on the state file. If no state file exists for 
 
 ```
 Error: No state file found for target 'prod'.
-  Run 'fab-bundle deploy -t prod' or 'fab-bundle import -t prod' first.
+  Run 'fab-bundle deploy --target prod' or 'fab-bundle import --target prod' first.
 ```
 
 When using a remote state backend (OneLake, Azure Blob, or ADLS), the drift command reads the remote state file so that any CI runner can check for drift without needing a local copy. See [State Management](state.md) for backend configuration.

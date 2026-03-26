@@ -41,20 +41,20 @@ fab-bundle validate
 ## Plan (dry-run)
 
 ```bash
-fab-bundle plan -t dev
+fab-bundle plan --target dev
 ```
 
 ## Deploy
 
 ```bash
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 ```
 
 ## Check status
 
 ```bash
-fab-bundle status -t dev
-fab-bundle drift -t dev
+fab-bundle status --target dev
+fab-bundle drift --target dev
 ```
 
 ---

@@ -60,13 +60,13 @@ ws.publish_all_items()
 
 **After (fab-bundle):**
 ```bash
-fab-bundle deploy -t prod -y
+fab-bundle deploy --target prod -y
 ```
 
 ### 4. Test
 
 ```bash
 fab-bundle validate
-fab-bundle plan -t staging
-fab-bundle deploy -t staging
+fab-bundle plan --target staging
+fab-bundle deploy --target staging
 ```

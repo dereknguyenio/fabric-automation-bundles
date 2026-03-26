@@ -15,7 +15,7 @@ You write notebooks and fabric.yml locally, test via `fab-bundle deploy`, and it
 │  1. fab-bundle init --template medallion        │
 │  2. Edit notebooks in VS Code / your editor     │
 │  3. fab-bundle validate                         │
-│  4. fab-bundle deploy -t dev                    │
+│  4. fab-bundle deploy --target dev                    │
 │  5. Open Fabric portal → run notebook → verify  │
 │  6. Fix issues locally → redeploy               │
 │  7. git commit + push → CI/CD to test/prod      │
@@ -33,13 +33,13 @@ cd my-project
 # Edit notebooks in ./notebooks/ with your editor
 
 # Deploy to dev to test
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 
 # Open Fabric portal — your notebooks are there
 # Run them, check the output, verify data in lakehouses
 
 # Something broken? Fix locally, redeploy
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 
 # Working? Commit and push
 git add -A && git commit -m "feat: add ETL pipeline"
@@ -202,7 +202,7 @@ git push
 # Step 6: CI/CD deploys infrastructure to test/prod
 # Notebooks are already synced via git
 # fab-bundle creates lakehouses, pipelines, security, environments
-fab-bundle deploy -t prod -y
+fab-bundle deploy --target prod -y
 ```
 
 ### What git sync handles vs what fab-bundle handles
@@ -254,7 +254,7 @@ The [Fabric Data Engineering VS Code Extension](https://learn.microsoft.com/en-u
 │  2. Connect to your dev workspace               │
 │  3. Create/edit notebooks in VS Code            │
 │  4. Run cells on Fabric Spark (remote compute)  │
-│  5. fab-bundle deploy -t dev  (infra changes)   │
+│  5. fab-bundle deploy --target dev  (infra changes)   │
 │  6. git commit + push → CI/CD to test/prod      │
 └─────────────────────────────────────────────────┘
 ```
@@ -284,7 +284,7 @@ The [Fabric Data Engineering VS Code Extension](https://learn.microsoft.com/en-u
 # 6. fab-bundle manages infrastructure
 fab-bundle init --name my-project
 # Edit fabric.yml for lakehouses, pipelines, security
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 
 # 7. Commit everything
 git add -A && git commit -m "feat: new ETL pipeline"
@@ -319,7 +319,7 @@ git push  # CI/CD deploys to test → prod
 
 # 5. "Now deploy the infrastructure"
 #    → Claude Code calls fab_deploy via MCP
-#    → Or you run: fab-bundle deploy -t dev
+#    → Or you run: fab-bundle deploy --target dev
 
 # 6. Commit and push → CI/CD handles test/prod
 ```
@@ -436,7 +436,7 @@ Claude: [calls fab_plan for prod → shows what would change]
 
 You: "Yes, deploy it"
 
-Claude: [calls fab_deploy -t prod]
+Claude: [calls fab_deploy --target prod]
         Deployed 12 resources to sales-analytics-prod.
 ```
 

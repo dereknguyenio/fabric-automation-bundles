@@ -46,13 +46,13 @@ Or manually map your Terraform resources:
 
 ```bash
 fab-bundle validate
-fab-bundle plan -t dev
+fab-bundle plan --target dev
 ```
 
 ### 4. Deploy
 
 ```bash
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 ```
 
 ### 5. Remove Terraform

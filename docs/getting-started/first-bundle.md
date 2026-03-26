@@ -39,5 +39,5 @@ Deploy:
 
 ```bash
 fab-bundle validate
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 ```

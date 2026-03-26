@@ -166,8 +166,8 @@ fab-bundle doctor
 Then run commands against your development environment:
 
 ```bash
-fab-bundle plan -t dev
-fab-bundle deploy -t dev
+fab-bundle plan --target dev
+fab-bundle deploy --target dev
 ```
 
 > **Note**
@@ -190,7 +190,7 @@ export AZURE_CLIENT_SECRET="your-client-secret"
 Then run commands non-interactively using the `--auto-approve` flag:
 
 ```bash
-fab-bundle deploy -t prod --auto-approve
+fab-bundle deploy --target prod --auto-approve
 ```
 
 **Setting up a service principal:**
@@ -223,7 +223,7 @@ steps:
   - script: pip install fabric-automation-bundles
     displayName: 'Install fab-bundle'
 
-  - script: fab-bundle deploy -t prod --auto-approve
+  - script: fab-bundle deploy --target prod --auto-approve
     displayName: 'Deploy to production'
     env:
       AZURE_TENANT_ID: $(AZURE_TENANT_ID)
@@ -252,7 +252,7 @@ jobs:
 
       - run: pip install fabric-automation-bundles
 
-      - run: fab-bundle deploy -t prod --auto-approve
+      - run: fab-bundle deploy --target prod --auto-approve
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}

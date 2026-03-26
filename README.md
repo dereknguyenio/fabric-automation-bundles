@@ -16,7 +16,7 @@ Define your entire Fabric project in a single `fabric.yml` — lakehouses, noteb
 fab-bundle init --template medallion --name my-project
 fab-bundle validate
 fab-bundle plan
-fab-bundle deploy -t prod
+fab-bundle deploy --target prod
 ```
 
 > **CLI naming:** The standalone CLI is `fab-bundle`. The long-term goal is integration as a `fab bundle` subcommand in the [Fabric CLI](https://github.com/microsoft/fabric-cli). Both syntaxes are shown in this documentation — use whichever applies to your installation.
@@ -87,7 +87,7 @@ targets:
 
 ```bash
 fab-bundle validate
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 ```
 
 This scans the workspace and produces a `fabric.yml` you can customize — the fastest on-ramp for existing projects.
@@ -103,7 +103,7 @@ Validates all resource references, dependency chains, and target configurations.
 ### Plan (Dry-Run)
 
 ```bash
-fab-bundle plan -t dev
+fab-bundle plan --target dev
 ```
 
 Shows exactly what would change:
@@ -128,15 +128,15 @@ Deployment Plan: my-analytics
 ### Deploy
 
 ```bash
-fab-bundle deploy -t dev        # Deploy to dev (default)
-fab-bundle deploy -t staging    # Deploy to staging
-fab-bundle deploy -t prod -y   # Deploy to prod (skip confirmation)
+fab-bundle deploy --target dev        # Deploy to dev (default)
+fab-bundle deploy --target staging    # Deploy to staging
+fab-bundle deploy --target prod -y   # Deploy to prod (skip confirmation)
 ```
 
 ### Destroy
 
 ```bash
-fab-bundle destroy -t dev       # Tear down dev environment
+fab-bundle destroy --target dev       # Tear down dev environment
 ```
 
 ### Use with GitHub Copilot or Claude Code (MCP)
@@ -303,8 +303,8 @@ include:
 flowchart TB
     subgraph local["🖥️ Local Development"]
         A["Author fabric.yml\n+ notebooks, SQL, etc."] --> B["fab-bundle validate"]
-        B --> C["fab-bundle plan -t dev"]
-        C --> D["fab-bundle deploy -t dev"]
+        B --> C["fab-bundle plan --target dev"]
+        C --> D["fab-bundle deploy --target dev"]
         D --> E["fab-bundle drift"]
         E -.->|"iterate"| A
         D --> F["git commit + push"]
@@ -312,11 +312,11 @@ flowchart TB
 
     subgraph cicd["⚙️ CI/CD Pipeline"]
         G["PR Opened"] --> H["fab-bundle validate"]
-        H --> I["fab-bundle plan -t staging"]
+        H --> I["fab-bundle plan --target staging"]
         I --> J{Merge to main}
-        J --> K["fab-bundle deploy -t staging -y"]
+        J --> K["fab-bundle deploy --target staging -y"]
         K --> L{Approval Gate}
-        L --> M["fab-bundle deploy -t prod -y"]
+        L --> M["fab-bundle deploy --target prod -y"]
     end
 
     subgraph fabric["☁️ Microsoft Fabric"]
@@ -344,13 +344,13 @@ flowchart TB
 | Stage | Command | What happens |
 |-------|---------|--------------|
 | Local dev | `fab-bundle validate` | Schema validation, reference checks, dependency resolution |
-| Local dev | `fab-bundle plan -t dev` | Connects to Fabric, diffs desired vs actual state |
-| Local dev | `fab-bundle deploy -t dev` | Creates/updates resources in dev workspace |
+| Local dev | `fab-bundle plan --target dev` | Connects to Fabric, diffs desired vs actual state |
+| Local dev | `fab-bundle deploy --target dev` | Creates/updates resources in dev workspace |
 | Local dev | `fab-bundle drift` | Detects out-of-band changes made in the portal |
 | PR check | `fab-bundle validate` | Gate: blocks merge if bundle is invalid |
-| PR check | `fab-bundle plan -t staging` | Informational: shows what the merge will change |
-| CI deploy | `fab-bundle deploy -t staging -y` | Auto-deploys on merge, service principal auth |
-| CI deploy | `fab-bundle deploy -t prod -y` | Deploys after manual approval gate |
+| PR check | `fab-bundle plan --target staging` | Informational: shows what the merge will change |
+| CI deploy | `fab-bundle deploy --target staging -y` | Auto-deploys on merge, service principal auth |
+| CI deploy | `fab-bundle deploy --target prod -y` | Deploys after manual approval gate |
 
 ### GitHub Actions
 
@@ -360,7 +360,7 @@ Copy `cicd/github-actions.yml` to `.github/workflows/fabric-bundle.yml`:
 - name: Deploy to Fabric
   run: |
     pip install fabric-automation-bundles
-    fab-bundle deploy -t prod -y
+    fab-bundle deploy --target prod -y
   env:
     AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
     AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -445,13 +445,13 @@ Fabric Automation Bundles uses `azure-identity` for authentication:
 ```bash
 # Interactive (development)
 az login
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 
 # Service Principal (CI/CD)
 export AZURE_TENANT_ID=...
 export AZURE_CLIENT_ID=...
 export AZURE_CLIENT_SECRET=...
-fab-bundle deploy -t prod -y
+fab-bundle deploy --target prod -y
 ```
 
 ## VS Code Integration

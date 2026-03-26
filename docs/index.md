@@ -9,7 +9,7 @@ Define your entire Fabric project in a single `fabric.yml` — lakehouses, noteb
 ```bash
 pip install fabric-automation-bundles
 fab-bundle init --template medallion --name my-project
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 ```
 
 ## Why?

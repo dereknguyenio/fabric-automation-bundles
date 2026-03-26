@@ -155,7 +155,7 @@ In deploy mode, unresolved variables cause a hard failure. In validate mode, use
 
 **Fix:**
 ```bash
-fab-bundle deploy -t dev --force  # Override the lock
+fab-bundle deploy --target dev --force  # Override the lock
 ```
 
 Or manually delete the lock file:

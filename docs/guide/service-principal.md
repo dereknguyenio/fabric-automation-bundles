@@ -98,7 +98,7 @@ Go to Pipelines → Library → create a variable group:
 export AZURE_TENANT_ID="..."
 export AZURE_CLIENT_ID="..."
 export AZURE_CLIENT_SECRET="..."
-fab-bundle deploy -t dev
+fab-bundle deploy --target dev
 ```
 
 ## Minimum Permissions

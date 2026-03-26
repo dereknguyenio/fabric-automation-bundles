@@ -1,0 +1,11 @@
+name: blank
+description: "Blank project — minimal fabric.yml to customize from scratch"
+version: "1.0.0"
+author: "Fabric Automation Bundles"
+variables:
+  project_name:
+    description: "Name of the project"
+    default: "my-fabric-project"
+  capacity_id:
+    description: "Fabric capacity GUID"
+    default: ""

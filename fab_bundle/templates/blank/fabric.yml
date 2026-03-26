@@ -1,0 +1,55 @@
+bundle:
+  name: ${{project_name}}
+  version: "1.0.0"
+  description: ""
+
+resources:
+  # Add your resources here. Examples:
+  #
+  # lakehouses:
+  #   my_lakehouse:
+  #     description: "My lakehouse"
+  #     enable_schemas: true
+  #
+  # notebooks:
+  #   my_notebook:
+  #     path: ./notebooks/my_notebook.py
+  #     description: "My notebook"
+  #     default_lakehouse: my_lakehouse
+  #
+  # pipelines:
+  #   my_pipeline:
+  #     description: "My pipeline"
+  #     activities:
+  #       - name: step1
+  #         notebook: my_notebook
+  #
+  # environments:
+  #   spark_env:
+  #     runtime: "1.3"
+  #     libraries:
+  #       - semantic-link-labs
+  #
+  # warehouses:
+  #   my_warehouse:
+  #     description: "My warehouse"
+  #
+  # data_agents:
+  #   my_agent:
+  #     description: "My data agent"
+  #     sources: [my_lakehouse]
+  #     instructions: ./agent/instructions.md
+
+  lakehouses: {}
+
+targets:
+  dev:
+    default: true
+    workspace:
+      name: ${{project_name}}-dev
+      capacity_id: "${{capacity_id}}"
+
+  # prod:
+  #   workspace:
+  #     name: ${{project_name}}-prod
+  #     capacity_id: "${{capacity_id}}"

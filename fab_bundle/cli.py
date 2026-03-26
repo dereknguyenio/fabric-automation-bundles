@@ -95,7 +95,7 @@ def init(template: str | None, output: str, name: str | None, var: tuple[str, ..
 
     # Defaults for non-interactive mode
     if not template:
-        template = "medallion"
+        template = "blank"
     if not name:
         name = click.prompt("Project name")
 

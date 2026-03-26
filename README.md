@@ -44,17 +44,50 @@ pip install fabric-automation-bundles
 ### Create a New Project
 
 ```bash
-# Medallion lakehouse architecture (bronze/silver/gold)
-fab-bundle init --template medallion --name my-analytics
+# Interactive wizard — pick a template, name, and capacity
+fab-bundle init
 
-# OSDU + Fabric for Oil, Gas & Energy
-fab-bundle init --template osdu_analytics --name my-osdu-project
+# Or specify directly
+fab-bundle init --template medallion --name my-analytics
 ```
+
+Available templates: `medallion` (bronze/silver/gold lakehouse), `osdu_analytics` (Oil, Gas & Energy)
 
 ### Or Generate from an Existing Workspace
 
 ```bash
 fab-bundle generate --workspace "My Existing Workspace"
+```
+
+### Or Start from Scratch
+
+```bash
+mkdir my-project && cd my-project
+```
+
+Create a `fabric.yml`:
+
+```yaml
+bundle:
+  name: my-project
+  version: "1.0.0"
+
+resources:
+  lakehouses:
+    my_lakehouse:
+      description: "My data store"
+
+targets:
+  dev:
+    default: true
+    workspace:
+      name: my-project-dev
+      capacity_id: "your-capacity-guid"
+```
+
+```bash
+fab-bundle validate
+fab-bundle deploy -t dev
 ```
 
 This scans the workspace and produces a `fabric.yml` you can customize — the fastest on-ramp for existing projects.

@@ -139,6 +139,12 @@ fab-bundle deploy --target prod -y   # Deploy to prod (skip confirmation)
 fab-bundle destroy --target dev       # Tear down dev environment
 ```
 
+### Try the CI/CD Pipeline
+
+[![Use this template](https://img.shields.io/badge/Use_this_template-238636?style=for-the-badge&logo=github)](https://github.com/dereknguyenio/fabric-fab-cicd-example/generate)
+
+Click above to create your own repo with a working dev → test → prod pipeline. Just add 5 secrets and push. [Setup guide →](https://github.com/dereknguyenio/fabric-fab-cicd-example#setup)
+
 ### Use with GitHub Copilot or Claude Code (MCP)
 
 ```bash

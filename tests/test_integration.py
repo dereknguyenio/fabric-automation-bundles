@@ -477,6 +477,14 @@ class TestAllItemTypes:
             )
 
 
+try:
+    import mcp
+    HAS_MCP = True
+except ImportError:
+    HAS_MCP = False
+
+
+@pytest.mark.skipif(not HAS_MCP, reason="mcp package not installed")
 class TestMCPSafety:
     """MCP deploy/destroy must require confirmation."""
 

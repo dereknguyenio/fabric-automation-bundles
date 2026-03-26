@@ -1,47 +1,57 @@
 bundle:
   name: ${{project_name}}
   version: "1.0.0"
-  description: ""
+  description: "A Fabric Automation Bundle project"
 
 resources:
-  # Add your resources here. Examples:
-  #
-  # lakehouses:
-  #   my_lakehouse:
-  #     description: "My lakehouse"
-  #     enable_schemas: true
-  #
-  # notebooks:
-  #   my_notebook:
-  #     path: ./notebooks/my_notebook.py
-  #     description: "My notebook"
-  #     default_lakehouse: my_lakehouse
-  #
+  # Spark environment with libraries
+  environments:
+    spark_env:
+      runtime: "1.3"
+      libraries: []
+      # - semantic-link-labs
+      # - delta-spark
+
+  # Data storage
+  lakehouses:
+    my_lakehouse:
+      description: "Default lakehouse"
+      enable_schemas: true
+
+  # Notebooks — add your .py or .ipynb files to src/
+  notebooks:
+    sample_notebook:
+      path: ./src/sample_notebook.py
+      description: "Sample notebook"
+      environment: spark_env
+      default_lakehouse: my_lakehouse
+
+  # Orchestration — chain notebooks into pipelines
   # pipelines:
-  #   my_pipeline:
-  #     description: "My pipeline"
+  #   sample_pipeline:
+  #     description: "Sample pipeline"
+  #     schedule:
+  #       cron: "0 6 * * *"
+  #       timezone: America/Chicago
   #     activities:
   #       - name: step1
-  #         notebook: my_notebook
-  #
-  # environments:
-  #   spark_env:
-  #     runtime: "1.3"
-  #     libraries:
-  #       - semantic-link-labs
-  #
+  #         notebook: sample_notebook
+
+  # SQL analytics
   # warehouses:
   #   my_warehouse:
-  #     description: "My warehouse"
-  #
+  #     description: "Analytics warehouse"
+  #     sql_scripts:
+  #       - ./resources/create_views.sql
+
+  # AI-powered data agent
   # data_agents:
   #   my_agent:
-  #     description: "My data agent"
+  #     description: "Natural language data access"
   #     sources: [my_lakehouse]
-  #     instructions: ./agent/instructions.md
+  #     instructions: ./resources/agent_instructions.md
 
-  lakehouses: {}
-
+# Deployment targets
 targets:
   dev:
     default: true
@@ -49,7 +59,14 @@ targets:
       name: ${{project_name}}-dev
       capacity_id: "${{capacity_id}}"
 
+  # staging:
+  #   workspace:
+  #     name: ${{project_name}}-staging
+  #     capacity_id: "${{capacity_id}}"
+
   # prod:
   #   workspace:
   #     name: ${{project_name}}-prod
   #     capacity_id: "${{capacity_id}}"
+  #   run_as:
+  #     service_principal: sp-fabric-prod

@@ -1,0 +1,19 @@
+# Sample Pipeline Configuration
+# Uncomment the pipeline section in fabric.yml to use this.
+#
+# This file is for reference — pipeline activities are defined
+# directly in fabric.yml under resources.pipelines.
+#
+# Example:
+#   pipelines:
+#     daily_refresh:
+#       description: "Daily ETL pipeline"
+#       schedule:
+#         cron: "0 6 * * *"
+#         timezone: America/Chicago
+#       activities:
+#         - name: ingest
+#           notebook: ingest_notebook
+#         - name: transform
+#           notebook: transform_notebook
+#           depends_on: [ingest]

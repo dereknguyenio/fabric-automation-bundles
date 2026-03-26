@@ -106,6 +106,32 @@ fab-bundle deploy -t prod -y   # Deploy to prod (skip confirmation)
 fab-bundle destroy -t dev       # Tear down dev environment
 ```
 
+### Use with Claude Code, GitHub Copilot, or Cursor (MCP)
+
+```bash
+pip install fabric-automation-bundles[mcp]
+```
+
+Add to `.claude/settings.json` (Claude Code) or your IDE's MCP config:
+
+```json
+{
+  "mcpServers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    }
+  }
+}
+```
+
+Then just talk: *"Deploy to dev"*, *"Check for drift in prod"*, *"Run the ETL pipeline"*
+
+12 MCP tools: validate, plan, deploy, destroy, status, drift, run, history, doctor, list-templates, list-workspaces, list-capacities.
+
+Copy [`examples/CLAUDE.md`](examples/CLAUDE.md) to your project root to give your AI assistant full context about fab-bundle.
+
+See the [MCP Server guide](https://dereknguyenio.github.io/fabric-automation-bundles/guide/mcp-server/) and [Development Workflows](https://dereknguyenio.github.io/fabric-automation-bundles/guide/development-workflows/) for details.
+
 ## The `fabric.yml` Format
 
 ```yaml

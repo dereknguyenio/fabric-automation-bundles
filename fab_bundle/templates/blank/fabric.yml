@@ -18,10 +18,10 @@ resources:
       description: "Default lakehouse"
       enable_schemas: true
 
-  # Notebooks — add your .py or .ipynb files to src/
+  # Notebooks — add your .py or .ipynb files to notebooks/
   notebooks:
     sample_notebook:
-      path: ./src/sample_notebook.py
+      path: ./notebooks/sample_notebook.py
       description: "Sample notebook"
       environment: spark_env
       default_lakehouse: my_lakehouse

@@ -7,7 +7,7 @@ A Microsoft Fabric project managed by [Fabric Automation Bundles](https://github
 ```
 ${{project_name}}/
 ├── fabric.yml              # Bundle definition — all resources, targets, security
-├── src/                    # Notebooks and source code
+├── notebooks/                    # Notebooks and source code
 │   └── sample_notebook.py  # Sample PySpark notebook
 ├── resources/              # Pipeline configs, SQL scripts, agent instructions
 ├── tests/                  # Validation tests
@@ -47,7 +47,7 @@ fab-bundle deploy -t dev     # Deploy to dev workspace
 
 ### Develop
 
-Edit notebooks in `src/`, then redeploy:
+Edit notebooks in `notebooks/`, then redeploy:
 
 ```bash
 fab-bundle deploy -t dev

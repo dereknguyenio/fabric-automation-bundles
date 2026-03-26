@@ -197,7 +197,13 @@ Then just talk: *"Deploy to dev"*, *"Check for drift in prod"*, *"Run the ETL pi
 
 12 MCP tools: validate, plan, deploy, destroy, status, drift, run, history, doctor, list-templates, list-workspaces, list-capacities.
 
-Copy [`examples/CLAUDE.md`](examples/CLAUDE.md) to your project root to give your AI assistant full context about fab-bundle.
+Copy the AI instructions file for your IDE to your project root:
+
+| IDE | Copy this file | To your project |
+|-----|---------------|-----------------|
+| Claude Code | [`examples/CLAUDE.md`](examples/CLAUDE.md) | `CLAUDE.md` |
+| GitHub Copilot | [`examples/.github/copilot-instructions.md`](examples/.github/copilot-instructions.md) | `.github/copilot-instructions.md` |
+| Cursor | [`examples/.cursorrules`](examples/.cursorrules) | `.cursorrules` |
 
 See the [MCP Server guide](https://dereknguyenio.github.io/fabric-automation-bundles/guide/mcp-server/) and [Development Workflows](https://dereknguyenio.github.io/fabric-automation-bundles/guide/development-workflows/) for details.
 

@@ -145,7 +145,43 @@ fab-bundle destroy -t dev       # Tear down dev environment
 pip install fabric-automation-bundles[mcp]
 ```
 
-Add to `.claude/settings.json` (Claude Code) or your IDE's MCP config:
+**Claude Code** — add to `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    }
+  }
+}
+```
+
+**GitHub Copilot** — add to `.github/copilot-mcp.json` in your repo root:
+
+```json
+{
+  "mcpServers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    }
+  }
+}
+```
+
+**Cursor** — add to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    }
+  }
+}
+```
+
+**Windsurf** — add to `~/.codeium/windsurf/mcp_config.json`:
 
 ```json
 {

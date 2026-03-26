@@ -234,16 +234,17 @@ def generate_bundle_from_workspace(
             elif resource_type == "data_agents":
                 pass  # Data agent is metadata-only in the bundle
 
+            elif resource_type in ("warehouses", "eventhouses", "eventstreams", "kql_databases",
+                                    "kql_dashboards", "kql_querysets", "ml_experiments", "ml_models",
+                                    "graphql_apis", "spark_job_definitions", "copy_jobs",
+                                    "airflow_jobs", "reflex", "variable_libraries", "ontologies",
+                                    "sql_databases", "data_agents"):
+                # Metadata-only types — no definition to export
+                resource_def["description"] = item.get("description", "")
+
             else:
-                logger.warning(
-                    "No export handler for resource type %r (item: %s). "
-                    "Item will be included with metadata only.",
-                    resource_type, display_name,
-                )
-                console.print(
-                    f"    [yellow]No export handler for type '{resource_type}' — "
-                    f"including metadata only for {display_name}[/yellow]"
-                )
+                console.print(f"  [yellow]Skipping:[/yellow] {display_name} ({resource_type}) — export not supported for this type")
+                continue  # Skip instead of including broken metadata
 
             resources[key] = resource_def
 

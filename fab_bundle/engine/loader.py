@@ -130,6 +130,7 @@ def _substitute_variables(obj: Any, variables: dict[str, str]) -> Any:
 def load_bundle(
     path: str | Path | None = None,
     target: str | None = None,
+    strict: bool = False,
 ) -> BundleDefinition:
     """
     Load and validate a bundle definition from a fabric.yml file.
@@ -137,6 +138,7 @@ def load_bundle(
     Args:
         path: Path to fabric.yml. If None, searches upward from cwd.
         target: Target name to resolve variables for.
+        strict: If True, raise BundleLoadError on unresolved variables instead of warning.
 
     Returns:
         Validated BundleDefinition.
@@ -213,12 +215,15 @@ def load_bundle(
     unresolved = UNRESOLVED_PATTERN.findall(raw_yaml)
     if unresolved:
         unique = sorted(set(unresolved))
-        import warnings
-        warnings.warn(
-            f"Unresolved variables in bundle: {', '.join(unique)}. "
-            f"These will be left as literal strings.",
-            stacklevel=2,
-        )
+        msg = f"Unresolved variables: {', '.join(unique)}"
+        if strict:
+            raise BundleLoadError(msg)
+        else:
+            import warnings
+            warnings.warn(
+                f"{msg}. These will be left as literal strings.",
+                stacklevel=2,
+            )
 
     try:
         bundle = BundleDefinition.model_validate(substituted)

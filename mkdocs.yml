@@ -44,13 +44,19 @@ nav:
     - Security & Permissions: guide/security.md
     - Secrets Management: guide/secrets.md
     - Templates: guide/templates.md
+    - Service Principal: guide/service-principal.md
     - MCP Server: guide/mcp-server.md
+    - Migrate from Terraform: guide/migrate-from-terraform.md
+    - Migrate from fabric-cicd: guide/migrate-from-fabric-cicd.md
+  - Reference:
+    - Environment Variables: reference/environment-variables.md
   - CLI Reference:
     - Commands: cli/commands.md
   - CI/CD:
     - Overview: cicd/overview.md
     - GitHub Actions: cicd/github-actions.md
     - Azure DevOps: cicd/azure-devops.md
+  - Troubleshooting: troubleshooting.md
   - Advanced:
     - State Management: advanced/state.md
     - Drift Detection: advanced/drift.md

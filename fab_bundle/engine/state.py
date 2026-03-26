@@ -240,6 +240,12 @@ class StateManager:
         filename = f"{int(state.last_deployed)}-{state.target_name}.json"
         (history_dir / filename).write_text(json.dumps(entry, indent=2, default=str))
 
+        # Also persist to backend
+        try:
+            self._backend.write(f"history-{filename.replace('.json', '')}", entry)
+        except Exception:
+            pass  # Best-effort for remote history
+
     def list_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """List deployment history entries, most recent first."""
         history_dir = self._state_dir / "history"

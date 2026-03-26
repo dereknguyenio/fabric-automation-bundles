@@ -86,6 +86,16 @@ class WorkspaceConfig(BaseModel):
     description: str | None = None
     git_integration: GitIntegrationConfig | None = None
 
+    @model_validator(mode="after")
+    def validate_workspace_config(self) -> "WorkspaceConfig":
+        if self.capacity_id and self.capacity_id != "":
+            import re
+            guid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+            # Only validate if it doesn't look like a variable reference
+            if not self.capacity_id.startswith("${") and not guid_pattern.match(self.capacity_id):
+                raise ValueError(f"capacity_id '{self.capacity_id}' is not a valid GUID format. Expected: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+        return self
+
     @property
     def effective_capacity_id(self) -> str | None:
         """Return capacity_id, falling back to capacity for backwards compat."""

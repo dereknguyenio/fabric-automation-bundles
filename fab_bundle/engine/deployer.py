@@ -23,6 +23,38 @@ from fab_bundle.providers.fabric_api import FabricApiError, FabricClient, ITEM_T
 from fab_bundle.engine.state import StateManager, compute_definition_hash
 
 
+def _format_deploy_error(resource_key: str, resource_type: str, error: Exception) -> str:
+    """Format a deployment error with actionable guidance."""
+    msg = str(error)
+    hints = []
+
+    if "DisplayName is Invalid" in msg:
+        hints.append("Resource names for lakehouses/warehouses can only contain letters, numbers, and underscores.")
+    elif "ItemDisplayNameNotAvailableYet" in msg:
+        hints.append("The name is temporarily unavailable (recently deleted). Wait a few minutes and retry.")
+    elif "NotebookId" in msg and "cannot be null" in msg:
+        hints.append("Pipeline references notebooks by ID. Ensure the notebook is deployed before the pipeline.")
+    elif "InvalidDefinitionFormat" in msg:
+        hints.append("The notebook definition format is invalid. Ensure .py files are valid Python.")
+    elif "MissingDefinition" in msg:
+        hints.append("This item type requires a definition file (e.g., TMDL for semantic models, PBIR for reports).")
+    elif "capacityId" in msg.lower() or "capacity" in msg.lower():
+        hints.append("Check that capacity_id is a valid GUID. Run: az rest --method get --url 'https://api.fabric.microsoft.com/v1/capacities' --resource 'https://api.fabric.microsoft.com'")
+    elif "Unauthorized" in msg or "401" in msg:
+        hints.append("Authentication failed. Run 'az login' or check your service principal credentials.")
+    elif "Forbidden" in msg or "403" in msg:
+        hints.append("You don't have permission. Check your workspace role or capacity access.")
+    elif "feature is not available" in msg:
+        hints.append("This item type requires a feature that's not enabled on your capacity.")
+    elif "UniversalSecurityFeatureDisabled" in msg:
+        hints.append("OneLake security must be enabled on this item. Open the lakehouse in the portal → Manage OneLake security → Enable.")
+
+    result = f"  ERROR {resource_key}: {msg}"
+    if hints:
+        result += "\n    Hint: " + " ".join(hints)
+    return result
+
+
 @dataclass
 class DeployResult:
     """Result of a deployment."""
@@ -35,6 +67,7 @@ class DeployResult:
     errors: list[str] = field(default_factory=list)
     item_ids: dict[str, str] = field(default_factory=dict)  # resource_key -> item_id
     rollback_log: list[str] = field(default_factory=list)
+    hook_warnings: list[str] = field(default_factory=list)
 
 
 class Deployer:
@@ -945,6 +978,14 @@ class Deployer:
 
         # Create workspace
         if self.dry_run:
+            # Try to find real workspace for accurate dry-run
+            ws = self.bundle.get_effective_workspace(target_name)
+            if ws.workspace_id:
+                return ws.workspace_id
+            if ws.name:
+                found = self.client.find_workspace(ws.name)
+                if found:
+                    return found["id"]
             self.console.print(f"  [dim]Would create workspace: {ws_config.name}[/dim]")
             return "dry-run-workspace-id"
 
@@ -1222,7 +1263,8 @@ class Deployer:
                 except FabricApiError as e:
                     result.items_failed += 1
                     result.errors.append(f"{item.resource_key}: {e}")
-                    self.console.print(f"  [red]ERROR[/red] {item.resource_key}: {e}")
+                    error_msg = _format_deploy_error(item.resource_key, item.resource_type, e)
+                    self.console.print(error_msg)
                 except FileNotFoundError as e:
                     result.items_failed += 1
                     result.errors.append(f"{item.resource_key}: {e}")
@@ -1242,15 +1284,25 @@ class Deployer:
 
         # Deploy security, git, connections, SQL scripts (only on success)
         if result.success and not self.dry_run:
-            self._publish_environments(workspace_id)
-            self._deploy_security(workspace_id)
-            self._deploy_onelake_roles(workspace_id)
-            self._deploy_git_integration(workspace_id)
-            self._deploy_connections()
-            self._deploy_shortcuts(workspace_id)
-            self._deploy_schedules(workspace_id)
-            self._execute_sql_scripts(workspace_id)
-            self._refresh_semantic_models(workspace_id)
+            hook_warnings: list[str] = []
+            for hook_name, hook_fn, hook_args in [
+                ("Environment publish", self._publish_environments, (workspace_id,)),
+                ("Security roles", self._deploy_security, (workspace_id,)),
+                ("OneLake roles", self._deploy_onelake_roles, (workspace_id,)),
+                ("Git integration", self._deploy_git_integration, (workspace_id,)),
+                ("Connections", self._deploy_connections, ()),
+                ("Shortcuts", self._deploy_shortcuts, (workspace_id,)),
+                ("Schedules", self._deploy_schedules, (workspace_id,)),
+                ("SQL scripts", self._execute_sql_scripts, (workspace_id,)),
+                ("Semantic model refresh", self._refresh_semantic_models, (workspace_id,)),
+            ]:
+                try:
+                    hook_fn(*hook_args)
+                except Exception as e:
+                    hook_warnings.append(f"{hook_name}: {e}")
+
+            # Report hook status in result
+            result.hook_warnings = hook_warnings
 
             validation_failures = self._run_post_deploy_validation(workspace_id, target_name)
             if validation_failures:
@@ -1300,6 +1352,11 @@ class Deployer:
             f"  Created: {result.items_created}  Updated: {result.items_updated}  "
             f"Deleted: {result.items_deleted}  Skipped: {result.items_skipped}  Failed: {result.items_failed}"
         )
+
+        if hasattr(result, 'hook_warnings') and result.hook_warnings:
+            self.console.print(f"  [yellow]Post-deploy warnings: {len(result.hook_warnings)}[/yellow]")
+            for w in result.hook_warnings:
+                self.console.print(f"    [yellow]![/yellow] {w}")
 
         # Release lock (always, even on error)
         try:

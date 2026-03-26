@@ -99,24 +99,26 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="fab_deploy",
-            description="Deploy the bundle to a target Fabric workspace. Creates/updates/deletes resources to match fabric.yml.",
+            description="Preview or deploy the bundle. Shows plan first — set confirm: true to execute.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "project_dir": {"type": "string", "description": "Path to project directory"},
                     "target": {"type": "string", "description": "Target environment"},
                     "dry_run": {"type": "boolean", "description": "Preview without making changes", "default": False},
+                    "confirm": {"type": "boolean", "description": "Set to true to execute after reviewing the plan. Without this, only shows the plan.", "default": False},
                 },
             },
         ),
         Tool(
             name="fab_destroy",
-            description="Destroy all bundle-managed resources in the target workspace. Deletes in reverse dependency order.",
+            description="Preview or destroy all bundle-managed resources. Shows items first — set confirm: true to execute.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "project_dir": {"type": "string", "description": "Path to project directory"},
                     "target": {"type": "string", "description": "Target environment"},
+                    "confirm": {"type": "boolean", "description": "Set to true to execute after reviewing the plan. Without this, only shows what would be destroyed.", "default": False},
                 },
                 "required": ["target"],
             },
@@ -203,6 +205,30 @@ async def list_tools() -> list[Tool]:
                 "properties": {},
             },
         ),
+        Tool(
+            name="fab_export",
+            description="Export item definitions from a deployed workspace to local files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_dir": {"type": "string", "description": "Path to project directory"},
+                    "target": {"type": "string", "description": "Target environment"},
+                    "output_dir": {"type": "string", "description": "Output directory for exported files", "default": "."},
+                },
+            },
+        ),
+        Tool(
+            name="fab_generate",
+            description="Generate a fabric.yml from an existing Fabric workspace.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workspace": {"type": "string", "description": "Workspace name or ID"},
+                    "output_dir": {"type": "string", "description": "Output directory", "default": "."},
+                },
+                "required": ["workspace"],
+            },
+        ),
     ]
 
 
@@ -230,6 +256,8 @@ def _dispatch(name: str, args: dict[str, Any]) -> str:
         "fab_list_templates": _handle_list_templates,
         "fab_list_workspaces": _handle_list_workspaces,
         "fab_list_capacities": _handle_list_capacities,
+        "fab_export": _handle_export,
+        "fab_generate": _handle_generate,
     }
     handler = handlers.get(name)
     if not handler:
@@ -314,6 +342,7 @@ def _handle_deploy(args: dict[str, Any]) -> str:
     project_dir = args.get("project_dir")
     target = args.get("target")
     dry_run = args.get("dry_run", False)
+    confirm = args.get("confirm", False)
 
     bundle = _load_bundle(project_dir, target)
     client = _get_client()
@@ -334,12 +363,43 @@ def _handle_deploy(args: dict[str, Any]) -> str:
     if not plan.has_changes:
         return "No changes to deploy."
 
+    # Always show the plan first
+    items = []
+    for item in plan.items:
+        if item.action.value != "no_change":
+            items.append({
+                "resource": item.resource_key,
+                "type": item.resource_type,
+                "action": item.action.value,
+            })
+
+    plan_summary = {
+        "workspace": ws.name,
+        "target": target or "default",
+        "summary": {
+            "create": sum(1 for i in items if i["action"] == "create"),
+            "update": sum(1 for i in items if i["action"] == "update"),
+            "delete": sum(1 for i in items if i["action"] == "delete"),
+        },
+        "items": items,
+    }
+
+    if not confirm and not dry_run:
+        plan_summary["confirmation_required"] = True
+        plan_summary["message"] = "Review the plan above. Call fab_deploy again with confirm: true to execute."
+        return _format_result(plan_summary)
+
+    if dry_run:
+        plan_summary["dry_run"] = True
+        return _format_result(plan_summary)
+
+    # Execute
     from fab_bundle.engine.deployer import Deployer
     from fab_bundle.engine.state import StateManager
     from rich.console import Console
 
     console = Console(file=open(os.devnull, "w"))
-    deployer = Deployer(client, bundle, proj_dir, console, dry_run=dry_run)
+    deployer = Deployer(client, bundle, proj_dir, console, dry_run=False)
     deployer.state_manager = StateManager(proj_dir, target or "default")
     result = deployer.execute(plan, target)
 
@@ -356,6 +416,7 @@ def _handle_deploy(args: dict[str, Any]) -> str:
 def _handle_destroy(args: dict[str, Any]) -> str:
     project_dir = args.get("project_dir")
     target = args.get("target")
+    confirm = args.get("confirm", False)
 
     bundle = _load_bundle(project_dir, target)
     client = _get_client()
@@ -375,15 +436,27 @@ def _handle_destroy(args: dict[str, Any]) -> str:
     from fab_bundle.engine.resolver import get_deployment_order
     order = get_deployment_order(bundle)
 
+    order_keys = [str(k) if not isinstance(k, str) else k for k in order]
+    items_to_delete = [key for key in reversed(order_keys) if key in items]
+
+    if not confirm:
+        return _format_result({
+            "workspace": ws.name,
+            "target": target or "default",
+            "items_to_destroy": items_to_delete,
+            "count": len(items_to_delete),
+            "confirmation_required": True,
+            "message": "Review the items above. Call fab_destroy again with confirm: true to execute.",
+        })
+
     deleted = []
     errors = []
-    for key in reversed(order):
-        if key in items:
-            try:
-                client.delete_item(ws_id, items[key]["id"])
-                deleted.append(key)
-            except Exception as e:
-                errors.append(f"{key}: {e}")
+    for key in items_to_delete:
+        try:
+            client.delete_item(ws_id, items[key]["id"])
+            deleted.append(key)
+        except Exception as e:
+            errors.append(f"{key}: {e}")
 
     return _format_result({
         "deleted": deleted,
@@ -600,6 +673,74 @@ def _handle_list_workspaces(args: dict[str, Any]) -> str:
             "type": ws.get("type", ""),
         })
     return _format_result(result)
+
+
+def _handle_export(args: dict[str, Any]) -> str:
+    project_dir = args.get("project_dir")
+    target = args.get("target")
+    output_dir = args.get("output_dir", ".")
+
+    bundle = _load_bundle(project_dir, target)
+    client = _get_client()
+
+    ws = bundle.get_effective_workspace(target)
+    ws_id = None
+    if ws.name:
+        found = client.find_workspace(ws.name)
+        ws_id = found["id"] if found else None
+
+    if not ws_id:
+        return "Workspace not found."
+
+    items = client.get_workspace_items_map(ws_id)
+    exported = []
+    errors = []
+
+    import base64
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    for name, info in items.items():
+        try:
+            defn = client.get_item_definition(ws_id, info["id"])
+            parts = defn.get("definition", {}).get("parts", [])
+            if parts:
+                item_dir = out / name
+                item_dir.mkdir(parents=True, exist_ok=True)
+                for part in parts:
+                    file_path = item_dir / part.get("path", "content")
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(base64.b64decode(part.get("payload", "")))
+                exported.append(name)
+        except Exception as e:
+            errors.append(f"{name}: {e}")
+
+    return _format_result({"exported": exported, "exported_count": len(exported), "errors": errors})
+
+
+def _handle_generate(args: dict[str, Any]) -> str:
+    workspace = args["workspace"]
+    output_dir = args.get("output_dir", ".")
+
+    client = _get_client()
+
+    is_guid = len(workspace) == 36 and workspace.count("-") == 4
+    if is_guid:
+        ws_id = workspace
+    else:
+        found = client.find_workspace(workspace)
+        if not found:
+            return f"Workspace '{workspace}' not found."
+        ws_id = found["id"]
+
+    try:
+        from fab_bundle.generators.reverse import generate_bundle
+        from rich.console import Console
+        console = Console(file=open(os.devnull, "w"))
+        generate_bundle(client, ws_id, Path(output_dir), console)
+        return _format_result({"status": "generated", "output_dir": output_dir})
+    except Exception as e:
+        return f"Generate failed: {e}"
 
 
 def _handle_list_capacities(args: dict[str, Any]) -> str:

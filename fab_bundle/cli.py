@@ -121,13 +121,14 @@ def init(template: str | None, output: str, name: str | None, var: tuple[str, ..
 @cli.command()
 @click.option("--file", "-f", "bundle_file", default=None, help="Path to fabric.yml")
 @click.option("--target", "-t", default=None, help="Target to validate against")
-def validate(bundle_file: str | None, target: str | None):
+@click.option("--strict", is_flag=True, default=False, help="Fail on unresolved variables and warnings")
+def validate(bundle_file: str | None, target: str | None, strict: bool):
     """Validate the bundle definition."""
     from fab_bundle.engine.loader import BundleLoadError, load_bundle
     from fab_bundle.engine.resolver import DependencyResolutionError, get_deployment_order
 
     try:
-        bundle = load_bundle(bundle_file, target)
+        bundle = load_bundle(bundle_file, target, strict=strict)
     except BundleLoadError as e:
         console.print(f"[red]Validation failed:[/red] {e}")
         if e.errors:
@@ -250,7 +251,7 @@ def deploy(bundle_file: str | None, target: str | None, dry_run: bool, auto_appr
     from fab_bundle.providers.fabric_api import FabricClient
 
     try:
-        bundle = load_bundle(bundle_file, target)
+        bundle = load_bundle(bundle_file, target, strict=True)
     except BundleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
@@ -644,6 +645,21 @@ def bind(resource_name: str, workspace: str, bundle_file: str | None):
     console.print(f"  Type:      {item_info.get('type')}")
     console.print(f"  Item ID:   {item_info.get('id')}")
     console.print(f"  Workspace: {workspace}")
+
+    # Record to state
+    from fab_bundle.engine.state import StateManager
+    bundle_path = Path(bundle_file) if bundle_file else Path.cwd()
+    project_dir = bundle_path.parent if bundle_path.is_file() else bundle_path
+    state_mgr = StateManager(project_dir, "default")
+    state_mgr.record_deployment(
+        bundle_name="bound",
+        bundle_version="",
+        workspace_id=workspace_id,
+        workspace_name=workspace,
+        deployed_items={resource_name: {"id": item_info["id"], "type": item_info.get("type", "")}},
+    )
+    console.print(f"  Recorded to state. Visible in 'fab-bundle status'.")
+
     console.print()
     console.print("  This resource will be managed by the bundle on the next deploy.")
     console.print("  Changes to fabric.yml will be applied to the existing item.")
@@ -723,6 +739,16 @@ def export(bundle_file: str | None, target: str | None, resource_name: str | Non
     import base64
     from fab_bundle.engine.loader import BundleLoadError, load_bundle
     from fab_bundle.providers.fabric_api import FabricClient
+
+    output_dir = Path(output)
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        test_file = output_dir / ".fab-bundle-write-test"
+        test_file.write_text("test")
+        test_file.unlink()
+    except (PermissionError, OSError) as e:
+        console.print(f"[red]Error:[/red] Cannot write to output directory: {e}")
+        sys.exit(1)
 
     try:
         bundle = load_bundle(bundle_file, target)
@@ -1520,6 +1546,30 @@ def graph(bundle_file: str | None, target: str | None, output_format: str, outpu
         console.print(f"Graph written to {output_file}")
     else:
         console.print(output)
+
+
+@cli.command("check-update")
+def check_update():
+    """Check if a newer version is available on PyPI."""
+    import urllib.request
+    import json as _json
+
+    try:
+        from fab_bundle import __version__
+        current = __version__
+
+        url = "https://pypi.org/pypi/fabric-automation-bundles/json"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = _json.loads(resp.read())
+            latest = data["info"]["version"]
+
+        if latest != current:
+            console.print(f"  Update available: [bold]{current}[/bold] → [bold green]{latest}[/bold green]")
+            console.print(f"  Run: pip install --upgrade fabric-automation-bundles")
+        else:
+            console.print(f"  You're on the latest version: {current}")
+    except Exception:
+        console.print("  [dim]Could not check for updates.[/dim]")
 
 
 if __name__ == "__main__":

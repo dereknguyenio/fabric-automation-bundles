@@ -180,7 +180,7 @@ class FabricClient:
 
                 if resp.status_code == 429:
                     # Rate limited — back off
-                    retry_after = int(resp.headers.get("Retry-After", 10))
+                    retry_after = int(resp.headers.get("Retry-After", min(30, 2 ** attempt)))
                     time.sleep(retry_after)
                     continue
 
@@ -195,7 +195,7 @@ class FabricClient:
                     # Check if retriable
                     is_retriable = error_body.get("isRetriable", False)
                     if is_retriable and attempt < retry_count - 1:
-                        wait = min(30, 5 * (attempt + 1))
+                        wait = min(60, 2 ** (attempt + 1) * 5)
                         time.sleep(wait)
                         continue
 

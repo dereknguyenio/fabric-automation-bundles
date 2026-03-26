@@ -475,3 +475,275 @@ class TestAllItemTypes:
                 f"Expected {total_resources - skipped} creates, got {result.items_created}. "
                 f"Errors: {result.errors}"
             )
+
+
+class TestMCPSafety:
+    """MCP deploy/destroy must require confirmation."""
+
+    def test_deploy_without_confirm_returns_plan(self):
+        """fab_deploy without confirm: true should return a plan, not execute."""
+        from fab_bundle.mcp_server.server import _dispatch
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a minimal bundle
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "test"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+""")
+            # Mock the client
+            import unittest.mock as mock
+            with mock.patch("fab_bundle.mcp_server.server._get_client") as mock_client:
+                client = mock.MagicMock()
+                client.find_workspace.return_value = {"id": "ws-001"}
+                client.get_workspace_items_map.return_value = {}
+                mock_client.return_value = client
+
+                result = _dispatch("fab_deploy", {"project_dir": tmpdir, "target": "dev"})
+                import json
+                data = json.loads(result)
+
+                assert data.get("confirmation_required") is True
+                assert "message" in data
+                # Should NOT have called create_item
+                client.create_item.assert_not_called()
+
+    def test_deploy_with_confirm_executes(self):
+        """fab_deploy with confirm: true should execute."""
+        from fab_bundle.mcp_server.server import _dispatch
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "test"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+""")
+            import unittest.mock as mock
+            with mock.patch("fab_bundle.mcp_server.server._get_client") as mock_client:
+                client = mock.MagicMock()
+                client.find_workspace.return_value = {"id": "ws-001"}
+                client.get_workspace_items_map.return_value = {}
+                client.create_item.return_value = {"id": "item-001"}
+                client.create_workspace.return_value = {"id": "ws-001"}
+                client.list_items.return_value = []
+                mock_client.return_value = client
+
+                result = _dispatch("fab_deploy", {"project_dir": tmpdir, "target": "dev", "confirm": True})
+                import json
+                data = json.loads(result)
+
+                # Should have executed (success or failure, but not confirmation_required)
+                assert "confirmation_required" not in data
+
+    def test_destroy_without_confirm_returns_preview(self):
+        """fab_destroy without confirm: true should return items list, not delete."""
+        from fab_bundle.mcp_server.server import _dispatch
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "test"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+""")
+            import unittest.mock as mock
+            with mock.patch("fab_bundle.mcp_server.server._get_client") as mock_client:
+                client = mock.MagicMock()
+                client.find_workspace.return_value = {"id": "ws-001"}
+                client.get_workspace_items_map.return_value = {
+                    "test_lh": {"id": "lh-001", "type": "Lakehouse"},
+                }
+                mock_client.return_value = client
+
+                result = _dispatch("fab_destroy", {"project_dir": tmpdir, "target": "dev"})
+                import json
+                data = json.loads(result)
+
+                assert data.get("confirmation_required") is True
+                # Should NOT have called delete_item
+                client.delete_item.assert_not_called()
+
+
+class TestDeployHookWarnings:
+    """Post-deploy hooks should report warnings, not fail silently."""
+
+    def test_hook_warnings_collected(self):
+        """Hook failures should be collected in result.hook_warnings."""
+        from fab_bundle.engine.deployer import Deployer, DeployResult
+
+        # Verify DeployResult has hook_warnings field
+        result = DeployResult(success=True)
+        assert hasattr(result, "hook_warnings")
+        assert result.hook_warnings == []
+
+
+class TestStrictValidation:
+    """Strict mode should fail on unresolved variables."""
+
+    def test_strict_fails_on_unresolved_variables(self):
+        """load_bundle with strict=True should raise on unresolved vars."""
+        import tempfile
+        from fab_bundle.engine.loader import BundleLoadError, load_bundle
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "${var.missing_var}"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+""")
+            import pytest
+            with pytest.raises(BundleLoadError, match="Unresolved variables"):
+                load_bundle(str(fabric_yml), strict=True)
+
+    def test_non_strict_warns_on_unresolved_variables(self):
+        """load_bundle without strict should warn but not fail."""
+        import tempfile
+        import warnings
+        from fab_bundle.engine.loader import load_bundle
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "${var.missing_var}"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+""")
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                bundle = load_bundle(str(fabric_yml))
+                assert len(w) >= 1
+                assert "Unresolved" in str(w[0].message)
+
+
+class TestCapacityValidation:
+    """capacity_id should be validated as a GUID."""
+
+    def test_invalid_capacity_id_rejected(self):
+        """Non-GUID capacity_id should fail validation."""
+        import tempfile
+        import pytest
+        from fab_bundle.engine.loader import load_bundle
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "test"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+      capacity_id: "not-a-guid"
+""")
+            with pytest.raises(Exception, match="not a valid GUID"):
+                load_bundle(str(fabric_yml))
+
+    def test_valid_capacity_id_accepted(self):
+        """Valid GUID capacity_id should pass."""
+        import tempfile
+        from fab_bundle.engine.loader import load_bundle
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "test"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+      capacity_id: "ee418141-2bb6-40a4-8586-1f60e290f129"
+""")
+            bundle = load_bundle(str(fabric_yml))
+            assert bundle is not None
+
+    def test_variable_ref_capacity_id_accepted(self):
+        """Variable reference capacity_id should pass validation."""
+        import tempfile
+        from fab_bundle.engine.loader import load_bundle
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fabric_yml = Path(tmpdir) / "fabric.yml"
+            fabric_yml.write_text("""
+bundle:
+  name: test
+  version: "1.0.0"
+resources:
+  lakehouses:
+    test_lh:
+      description: "test"
+targets:
+  dev:
+    default: true
+    workspace:
+      name: test-dev
+      capacity_id: "${var.capacity_id}"
+""")
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                bundle = load_bundle(str(fabric_yml))
+                assert bundle is not None

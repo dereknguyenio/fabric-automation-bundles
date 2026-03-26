@@ -37,6 +37,7 @@ nav:
     - Quick Start: getting-started/quickstart.md
     - Your First Bundle: getting-started/first-bundle.md
   - Guide:
+    - Development Workflows: guide/development-workflows.md
     - fabric.yml Reference: guide/fabric-yml.md
     - Resource Types: guide/resource-types.md
     - Targets & Variables: guide/targets-variables.md

@@ -1,5 +1,11 @@
 # Fabric Automation Bundles
 
+[![PyPI](https://img.shields.io/pypi/v/fabric-automation-bundles?color=teal)](https://pypi.org/project/fabric-automation-bundles/)
+[![Python](https://img.shields.io/pypi/pyversions/fabric-automation-bundles)](https://pypi.org/project/fabric-automation-bundles/)
+[![License](https://img.shields.io/github/license/dereknguyenio/fabric-automation-bundles)](https://github.com/dereknguyenio/fabric-automation-bundles/blob/main/LICENSE)
+[![Tests](https://img.shields.io/github/actions/workflow/status/dereknguyenio/fabric-automation-bundles/ci.yml?label=tests)](https://github.com/dereknguyenio/fabric-automation-bundles/actions)
+[![Docs](https://img.shields.io/badge/docs-live-teal)](https://dereknguyenio.github.io/fabric-automation-bundles/)
+
 > **v1.0.0-beta** — 30 item types verified against live Fabric API. Production-ready for core workflows. [See what's tested.](#tested-item-types)
 
 **Declarative project definitions for Microsoft Fabric.**

@@ -236,20 +236,125 @@ fab-bundle deploy -t prod -y
 
 ---
 
+## Pattern 4: VS Code + Fabric Extension + fab-bundle
+
+Best for: Developers who want the full VS Code experience (Claude Code, GitHub Copilot, extensions) while running notebooks on real Fabric Spark compute.
+
+The [Fabric Data Engineering VS Code Extension](https://learn.microsoft.com/en-us/fabric/data-engineering/setup-vs-code-extension) lets you author notebooks in VS Code and execute them on remote Fabric Spark — no portal needed.
+
+```
+┌─────────────────────────────────────────────────┐
+│ VS Code                                         │
+│                                                 │
+│  Fabric Extension  ← connects to workspace      │
+│  Claude Code / Copilot  ← AI assistance         │
+│  fab-bundle  ← infrastructure + deployment      │
+│                                                 │
+│  1. Install Fabric VS Code Extension            │
+│  2. Connect to your dev workspace               │
+│  3. Create/edit notebooks in VS Code            │
+│  4. Run cells on Fabric Spark (remote compute)  │
+│  5. fab-bundle deploy -t dev  (infra changes)   │
+│  6. git commit + push → CI/CD to test/prod      │
+└─────────────────────────────────────────────────┘
+```
+
+### Setup
+
+```bash
+# 1. Install the Fabric VS Code extension
+#    VS Code → Extensions → search "Fabric Data Engineering" → Install
+#    Or: code --install-extension ms-fabric.fabricdataengineering
+
+# 2. Sign in to Fabric
+#    Click the Fabric icon in VS Code sidebar → Sign in
+
+# 3. Select your workspace
+#    Browse workspaces → select your dev workspace
+
+# 4. Open or create notebooks
+#    Notebooks appear in the explorer → edit with full VS Code features
+#    Select kernel "Microsoft Fabric Runtime" to run on remote Spark
+
+# 5. Use AI assistance
+#    Claude Code: ask it to write Spark code, fix errors, optimize queries
+#    Copilot: inline completions while writing PySpark
+#    Fabric AI Agent: context-aware notebook assistance (March 2026)
+
+# 6. fab-bundle manages infrastructure
+fab-bundle init --name my-project
+# Edit fabric.yml for lakehouses, pipelines, security
+fab-bundle deploy -t dev
+
+# 7. Commit everything
+git add -A && git commit -m "feat: new ETL pipeline"
+git push  # CI/CD deploys to test → prod
+```
+
+### What each tool handles
+
+| Tool | Responsibility |
+|------|----------------|
+| **Fabric VS Code Extension** | Notebook editing + remote Spark execution |
+| **Claude Code / Copilot** | AI-assisted code writing + debugging |
+| **fab-bundle** | Infrastructure (lakehouses, pipelines, security, environments) |
+| **fab-bundle deploy** | Promotion to test/prod |
+| **Git** | Version control + CI/CD trigger |
+
+### The AI-assisted development loop
+
+```bash
+# In VS Code with Claude Code + Fabric Extension:
+
+# 1. "Create a notebook that reads from bronze and deduplicates by order_id"
+#    → Claude Code writes the PySpark code
+
+# 2. Run it on Fabric Spark (Ctrl+Enter on cell)
+#    → Executes on remote compute, real data
+
+# 3. "This is slow, optimize the join"
+#    → Claude Code rewrites with broadcast join
+
+# 4. Run again → verify it's faster
+
+# 5. "Now deploy the infrastructure"
+#    → Claude Code calls fab_deploy via MCP
+#    → Or you run: fab-bundle deploy -t dev
+
+# 6. Commit and push → CI/CD handles test/prod
+```
+
+### Limitations
+
+- Fabric VS Code Extension requires sign-in (can't work fully offline)
+- Remote Spark execution has startup latency (~30s for first cell)
+- Some Fabric features (pipeline designer, semantic model editor) are portal-only
+- The extension is GA but some features (AI agent) are still preview
+
+### When to use
+
+- Teams that live in VS Code
+- Developers using Claude Code or GitHub Copilot for AI assistance
+- When you want real Spark execution without leaving your editor
+- Best of both worlds: local editing + remote compute + AI + CI/CD
+
+---
+
 ## Comparison
 
-| | Write Local | Portal + Export | Git Sync + fab-bundle |
-|---|---|---|---|
-| **Notebook editing** | VS Code / editor | Fabric portal | Fabric portal |
-| **Testing** | Deploy to dev, run in portal | Run directly in portal | Run directly in portal |
-| **Git integration** | Manual commit | Manual export + commit | Auto-sync |
-| **Infrastructure** | fabric.yml | fabric.yml (generated) | fabric.yml |
-| **CI/CD** | Full (notebooks + infra) | Full (notebooks + infra) | Infra only (or full) |
-| **Best for** | New projects, code-first | Existing workspaces | Enterprise, large teams |
-| **Complexity** | Low | Medium | Medium-High |
+| | Write Local | Portal + Export | Git Sync + fab-bundle | VS Code + Fabric Extension |
+|---|---|---|---|---|
+| **Notebook editing** | VS Code (no Spark) | Fabric portal | Fabric portal | VS Code (with Spark) |
+| **Testing** | Deploy first, then portal | Run in portal | Run in portal | Run from VS Code |
+| **AI assistance** | Claude Code / Copilot | Fabric Copilot | Fabric Copilot | Claude Code + Copilot + Fabric AI Agent |
+| **Git integration** | Manual commit | Manual export | Auto-sync | Manual commit |
+| **Infrastructure** | fabric.yml | fabric.yml (generated) | fabric.yml | fabric.yml |
+| **Best for** | Simple projects | Existing workspaces | Enterprise | AI-first development |
+| **Complexity** | Low | Medium | Medium-High | Medium |
 
 ## Recommended Starting Point
 
 1. **New project?** → Pattern 1 (Write Local). Run `fab-bundle init` and start coding.
 2. **Existing workspace?** → Pattern 2 (Portal + Export). Run `fab-bundle generate` to capture what you have.
 3. **Enterprise with git sync?** → Pattern 3. Use git sync for notebooks, fab-bundle for everything else.
+4. **Want AI + real Spark in VS Code?** → Pattern 4. Install the Fabric VS Code Extension + Claude Code/Copilot + fab-bundle MCP server.

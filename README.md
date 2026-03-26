@@ -139,13 +139,13 @@ fab-bundle deploy -t prod -y   # Deploy to prod (skip confirmation)
 fab-bundle destroy -t dev       # Tear down dev environment
 ```
 
-### Use with Claude Code or GitHub Copilot (MCP)
+### Use with GitHub Copilot or Claude Code (MCP)
 
 ```bash
 pip install fabric-automation-bundles[mcp]
 ```
 
-**Claude Code** — add to `.claude/settings.json`:
+**GitHub Copilot** — add to `.github/copilot-mcp.json` in your repo root:
 
 ```json
 {
@@ -157,7 +157,7 @@ pip install fabric-automation-bundles[mcp]
 }
 ```
 
-**GitHub Copilot** — add to `.github/copilot-mcp.json` in your repo root:
+**Claude Code** — add to `.claude/settings.json`:
 
 ```json
 {
@@ -177,8 +177,8 @@ Copy the AI instructions file for your IDE to your project root:
 
 | IDE | Copy this file | To your project |
 |-----|---------------|-----------------|
-| Claude Code | [`examples/CLAUDE.md`](examples/CLAUDE.md) | `CLAUDE.md` |
 | GitHub Copilot | [`examples/.github/copilot-instructions.md`](examples/.github/copilot-instructions.md) | `.github/copilot-instructions.md` |
+| Claude Code | [`examples/CLAUDE.md`](examples/CLAUDE.md) | `CLAUDE.md` |
 
 See the [MCP Server guide](https://dereknguyenio.github.io/fabric-automation-bundles/guide/mcp-server/) and [Development Workflows](https://dereknguyenio.github.io/fabric-automation-bundles/guide/development-workflows/) for details.
 

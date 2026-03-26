@@ -27,7 +27,7 @@ console = Console()
 
 
 @click.group("bundle")
-@click.version_option(version="0.5.0", prog_name="fabric-automation-bundles")
+@click.version_option(version=None, prog_name="fabric-automation-bundles", package_name="fabric-automation-bundles")
 def cli():
     """Fabric Automation Bundles — declarative project definitions for Microsoft Fabric."""
     pass

@@ -20,7 +20,7 @@ resources:
   # Environments
   # ---------------------------------------------------------------------------
   environments:
-    osdu-spark-env:
+    osdu_spark_env:
       runtime: "1.3"
       description: "Spark environment for OSDU data processing"
       libraries:
@@ -33,18 +33,18 @@ resources:
   # Lakehouses
   # ---------------------------------------------------------------------------
   lakehouses:
-    osdu-raw-lakehouse:
+    osdu_raw_lakehouse:
       description: "Raw OSDU entities from ADME — JSON format, append-only"
       enable_schemas: true
       shortcuts:
         - name: adme-raw
           target: "abfss://osdu-data@${var.adls_account}.dfs.core.windows.net/raw"
 
-    osdu-curated-lakehouse:
+    osdu_curated_lakehouse:
       description: "Flattened and typed OSDU entities — SQL-queryable Delta tables"
       enable_schemas: true
 
-    production-lakehouse:
+    production_lakehouse:
       description: "Production volumes, allocations, and time-series data"
       enable_schemas: true
 
@@ -52,29 +52,29 @@ resources:
   # Notebooks: OSDU Entity ETL
   # ---------------------------------------------------------------------------
   notebooks:
-    ingest-osdu-entities:
+    ingest_osdu_entities:
       path: ./notebooks/ingest_osdu_entities.py
       description: "Pull well, wellbore, and survey entities from ADME REST API"
-      environment: osdu-spark-env
-      default_lakehouse: osdu-raw-lakehouse
+      environment: osdu_spark_env
+      default_lakehouse: osdu_raw_lakehouse
 
-    flatten-wells:
+    flatten_wells:
       path: ./notebooks/flatten_wells.py
       description: "Flatten OSDU Well master data JSON into typed Delta tables"
-      environment: osdu-spark-env
-      default_lakehouse: osdu-curated-lakehouse
+      environment: osdu_spark_env
+      default_lakehouse: osdu_curated_lakehouse
 
-    flatten-wellbores:
+    flatten_wellbores:
       path: ./notebooks/flatten_wellbores.py
       description: "Flatten OSDU Wellbore entities with parent well relationships"
-      environment: osdu-spark-env
-      default_lakehouse: osdu-curated-lakehouse
+      environment: osdu_spark_env
+      default_lakehouse: osdu_curated_lakehouse
 
-    process-production:
+    process_production:
       path: ./notebooks/process_production.py
       description: "Process daily/monthly production volumes into analytics-ready tables"
-      environment: osdu-spark-env
-      default_lakehouse: production-lakehouse
+      environment: osdu_spark_env
+      default_lakehouse: production_lakehouse
 
   # ---------------------------------------------------------------------------
   # Pipelines
@@ -88,22 +88,22 @@ resources:
         timezone: America/Chicago
       activities:
         - name: ingest
-          notebook: ingest-osdu-entities
-        - name: flatten-wells
-          notebook: flatten-wells
-          depends_on: [ingest-osdu-entities]
-        - name: flatten-wellbores
-          notebook: flatten-wellbores
-          depends_on: [ingest-osdu-entities]
+          notebook: ingest_osdu_entities
+        - name: flatten_wells
+          notebook: flatten_wells
+          depends_on: [ingest_osdu_entities]
+        - name: flatten_wellbores
+          notebook: flatten_wellbores
+          depends_on: [ingest_osdu_entities]
         - name: production
-          notebook: process-production
-          depends_on: [flatten-wells, flatten-wellbores]
+          notebook: process_production
+          depends_on: [flatten_wells, flatten_wellbores]
 
   # ---------------------------------------------------------------------------
   # Warehouse: SQL views for BI
   # ---------------------------------------------------------------------------
   warehouses:
-    osdu-analytics-warehouse:
+    osdu_analytics_warehouse:
       description: "SQL views joining wells, wellbores, and production for BI consumption"
       sql_scripts:
         - ./sql/create_well_views.sql
@@ -116,7 +116,7 @@ resources:
     well-analytics-model:
       path: ./semantic_model/
       description: "Power BI semantic model for well and production analytics"
-      default_lakehouse: osdu-curated-lakehouse
+      default_lakehouse: osdu_curated_lakehouse
 
   reports:
     well-dashboard:
@@ -133,12 +133,12 @@ resources:
   # Data Agent
   # ---------------------------------------------------------------------------
   data_agents:
-    osdu-data-agent:
+    osdu_data_agent:
       description: "Natural language interface for well and production data queries"
       sources:
-        - osdu-curated-lakehouse
-        - production-lakehouse
-        - osdu-analytics-warehouse
+        - osdu_curated_lakehouse
+        - production_lakehouse
+        - osdu_analytics_warehouse
       instructions: ./agent/instructions.md
       few_shot_examples: ./agent/examples.yaml
       tables_in_scope:

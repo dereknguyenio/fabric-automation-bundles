@@ -139,7 +139,7 @@ fab-bundle deploy -t prod -y   # Deploy to prod (skip confirmation)
 fab-bundle destroy -t dev       # Tear down dev environment
 ```
 
-### Use with Claude Code, GitHub Copilot, or Cursor (MCP)
+### Use with Claude Code or GitHub Copilot (MCP)
 
 ```bash
 pip install fabric-automation-bundles[mcp]
@@ -169,30 +169,6 @@ pip install fabric-automation-bundles[mcp]
 }
 ```
 
-**Cursor** — add to `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "fab-bundle": {
-      "command": "fab-bundle-mcp"
-    }
-  }
-}
-```
-
-**Windsurf** — add to `~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "fab-bundle": {
-      "command": "fab-bundle-mcp"
-    }
-  }
-}
-```
-
 Then just talk: *"Deploy to dev"*, *"Check for drift in prod"*, *"Run the ETL pipeline"*
 
 12 MCP tools: validate, plan, deploy, destroy, status, drift, run, history, doctor, list-templates, list-workspaces, list-capacities.
@@ -203,7 +179,6 @@ Copy the AI instructions file for your IDE to your project root:
 |-----|---------------|-----------------|
 | Claude Code | [`examples/CLAUDE.md`](examples/CLAUDE.md) | `CLAUDE.md` |
 | GitHub Copilot | [`examples/.github/copilot-instructions.md`](examples/.github/copilot-instructions.md) | `.github/copilot-instructions.md` |
-| Cursor | [`examples/.cursorrules`](examples/.cursorrules) | `.cursorrules` |
 
 See the [MCP Server guide](https://dereknguyenio.github.io/fabric-automation-bundles/guide/mcp-server/) and [Development Workflows](https://dereknguyenio.github.io/fabric-automation-bundles/guide/development-workflows/) for details.
 

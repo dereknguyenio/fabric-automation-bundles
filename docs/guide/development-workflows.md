@@ -342,13 +342,13 @@ git push  # CI/CD deploys to test → prod
 
 ## Pattern 5: MCP-Driven Development (Conversational)
 
-Best for: Developers using Claude Code, Cursor, or Windsurf who want to manage Fabric entirely through conversation.
+Best for: Developers using GitHub Copilot or Claude Code who want to manage Fabric entirely through conversation.
 
 With the fab-bundle MCP server + [Microsoft Fabric MCP Server](https://github.com/microsoft/mcp), you can scaffold, deploy, run, and monitor Fabric projects without typing CLI commands.
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ Claude Code / Cursor / Windsurf                 │
+│ GitHub Copilot / Claude Code                     │
 │                                                 │
 │  MCP Servers:                                   │
 │    fab-bundle-mcp  → deploy, plan, status, run  │
@@ -474,7 +474,7 @@ Use them together: Microsoft's MCP gives the AI knowledge about Fabric APIs, fab
 
 ### When to use
 
-- You already use Claude Code, Cursor, or Windsurf
+- You already use GitHub Copilot or Claude Code
 - You prefer conversational development over CLI commands
 - Quick operations: "deploy to dev", "check drift", "what's deployed"
 - Demos and onboarding — show new team members how Fabric works
@@ -499,4 +499,4 @@ Use them together: Microsoft's MCP gives the AI knowledge about Fabric APIs, fab
 2. **Existing workspace?** → Pattern 2 (Portal + Export). Run `fab-bundle generate` to capture what you have.
 3. **Enterprise with git sync?** → Pattern 3. Use git sync for notebooks, fab-bundle for everything else.
 4. **Want AI + real Spark in VS Code?** → Pattern 4. Install the Fabric VS Code Extension + Claude Code/Copilot.
-5. **Want to talk to your infrastructure?** → Pattern 5. Add fab-bundle MCP server to Claude Code/Cursor.
+5. **Want to talk to your infrastructure?** → Pattern 5. Add fab-bundle MCP server to GitHub Copilot or Claude Code.

@@ -1,6 +1,6 @@
 # MCP Server
 
-Use fab-bundle as an MCP (Model Context Protocol) server in Claude Code, Cursor, Windsurf, or any MCP-compatible client. This lets you manage Fabric workspaces conversationally.
+Use fab-bundle as an MCP (Model Context Protocol) server in GitHub Copilot, Claude Code, or any MCP-compatible client. This lets you manage Fabric workspaces conversationally.
 
 ## Install
 
@@ -9,6 +9,22 @@ pip install fabric-automation-bundles[mcp]
 ```
 
 ## Configure
+
+### GitHub Copilot
+
+Add to your project's `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    }
+  }
+}
+```
+
+Or add to your VS Code user settings (`settings.json`) under `"mcp.servers"` to use across all projects.
 
 ### Claude Code
 
@@ -29,20 +45,6 @@ Or add globally to `~/.claude/settings.json` to use across all projects.
 ### Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "fab-bundle": {
-      "command": "fab-bundle-mcp"
-    }
-  }
-}
-```
-
-### Cursor / Windsurf
-
-Add to your MCP configuration file (check your IDE's MCP docs for the exact path):
 
 ```json
 {
@@ -84,19 +86,96 @@ Run `fab-bundle doctor` to verify everything is configured correctly.
 ## Example Conversations
 
 **"What's in my Fabric workspace?"**
-> Uses `fab_status` to show all deployed resources with their types and IDs.
+> The AI calls `fab_status` and responds:
+>
+> *"Your dev workspace has 12 items deployed: 3 lakehouses (bronze, silver, gold), 3 notebooks (ingest_to_bronze, transform_to_silver, aggregate_to_gold), 2 pipelines (daily_etl, weekly_refresh), 1 Spark environment, 1 warehouse, 1 SQL analytics endpoint, and 1 data agent. Last deployment was 3 hours ago. No drift detected."*
 
 **"Deploy my project to dev"**
-> Uses `fab_validate` to check the bundle, then `fab_plan` to show changes, then `fab_deploy` to execute.
+> The AI first calls `fab_validate` to check your bundle, then `fab_plan` to preview changes:
+>
+> *"Your fabric.yml is valid. Here's what will happen: 3 lakehouses will be created, 3 notebooks uploaded, and 2 pipelines configured with schedules. Total: 8 new resources. No existing resources will be modified. Should I proceed with the deployment?"*
+>
+> After you confirm, it calls `fab_deploy` and reports:
+>
+> *"Deployed 8 resources to sales-analytics-dev in 45 seconds. All items created successfully. You can open the workspace at https://app.fabric.microsoft.com/..."*
 
 **"Something changed in prod that I didn't deploy"**
-> Uses `fab_drift` to compare deployed state against the bundle definition.
+> The AI calls `fab_drift` and responds:
+>
+> *"I found drift in 2 items. A notebook 'manual_fix' was added directly in the portal (not in your fabric.yml). And the 'daily_etl' pipeline schedule was changed from 6:00 AM to 8:00 AM. Would you like me to update your fabric.yml to match, or redeploy to revert the changes?"*
 
 **"Run the ETL pipeline"**
-> Uses `fab_run` with the pipeline name and target environment.
+> The AI calls `fab_run` and responds:
+>
+> *"I've submitted the 'daily_etl' pipeline in the dev workspace. Job ID: a3f8c... You can monitor progress in the Fabric portal under Monitoring Hub. I'll check back -- want me to poll the status?"*
 
 **"Set up a new Fabric project"**
-> Uses `fab_list_capacities` to find available capacity, then `fab_list_templates` to show options.
+> The AI calls `fab_list_capacities` and `fab_list_templates`, then responds:
+>
+> *"You have 2 capacities available: 'Team-Dev' (F8, West US 2) and 'Prod' (F16, East US). I found 4 templates: medallion (bronze/silver/gold lakehouse), starter (single lakehouse + notebook), warehouse (SQL-first with views), and custom (empty scaffold). Which template and capacity would you like to use?"*
+
+## Setting up both MCP servers
+
+For the best experience, use **fab-bundle-mcp** alongside **[Microsoft's Fabric MCP server](https://github.com/microsoft/mcp)**. fab-bundle-mcp lets the AI act on your workspace (deploy, plan, status), while Microsoft's Fabric MCP gives the AI deep knowledge of Fabric APIs and best practices.
+
+### GitHub Copilot (`.vscode/mcp.json`)
+
+```json
+{
+  "servers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    },
+    "fabric": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-fetch", "https://github.com/microsoft/mcp"]
+    }
+  }
+}
+```
+
+> Check Microsoft's [Fabric MCP repo](https://github.com/microsoft/mcp) for the latest install command -- the `args` above are illustrative.
+
+### Claude Code (`.claude/settings.json`)
+
+```json
+{
+  "mcpServers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    },
+    "fabric": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-fetch", "https://github.com/microsoft/mcp"]
+    }
+  }
+}
+```
+
+### Claude Desktop (`claude_desktop_config.json`)
+
+```json
+{
+  "mcpServers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    },
+    "fabric": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-fetch", "https://github.com/microsoft/mcp"]
+    }
+  }
+}
+```
+
+### What each server provides
+
+| MCP Server | Purpose | Example |
+|------------|---------|---------|
+| **fab-bundle-mcp** | Manage your Fabric project: deploy, plan, status, run, drift, destroy | "Deploy to dev", "Check for drift" |
+| **Microsoft Fabric MCP** | Fabric API docs, best practices, item schemas | "How do I configure a pipeline trigger?", "What Spark versions does Fabric support?" |
+
+Together, the AI can both *understand* Fabric and *act* on your workspace.
 
 ## Troubleshooting
 

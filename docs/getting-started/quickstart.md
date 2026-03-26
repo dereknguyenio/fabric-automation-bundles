@@ -59,9 +59,9 @@ fab-bundle drift -t dev
 
 ---
 
-## Quick Start with Claude Code (MCP)
+## Quick Start with MCP (GitHub Copilot or Claude Code)
 
-If you use Claude Code, Cursor, or Windsurf, you can manage Fabric conversationally instead of typing CLI commands.
+If you use GitHub Copilot or Claude Code, you can manage Fabric conversationally instead of typing CLI commands.
 
 ### 1. Install with MCP support
 
@@ -76,6 +76,18 @@ az login
 ```
 
 ### 3. Add the MCP server
+
+**GitHub Copilot** — add to `.vscode/mcp.json` in your project root (or VS Code user `settings.json` under `"mcp.servers"` for global):
+
+```json
+{
+  "servers": {
+    "fab-bundle": {
+      "command": "fab-bundle-mcp"
+    }
+  }
+}
+```
 
 **Claude Code** — add to `.claude/settings.json` in your project root (or `~/.claude/settings.json` for global):
 
@@ -101,11 +113,12 @@ az login
 }
 ```
 
-**Cursor / Windsurf** — add to your IDE's MCP config file (check your IDE's MCP docs for the exact path).
+### 4. Add AI instructions to your project (optional but recommended)
 
-### 4. Add CLAUDE.md to your project (optional but recommended)
+Copy `examples/.github/copilot-instructions.md` or `examples/CLAUDE.md` to your project. These give your AI assistant context about your project structure and available tools.
 
-Copy `examples/CLAUDE.md` from the fab-bundle repo to your project root. This gives Claude Code context about your project structure and available tools.
+- **GitHub Copilot:** Copy `examples/.github/copilot-instructions.md` to `.github/copilot-instructions.md`
+- **Claude Code:** Copy `examples/CLAUDE.md` to `CLAUDE.md` in your project root
 
 ### 5. Start talking
 

@@ -1,4 +1,6 @@
-# Fabric Automation Bundles
+# <img src="assets/fabric-icon.png" width="32" height="32" align="top" /> Fabric Automation Bundles
+
+> **Public Preview**
 
 **Declarative project definitions for Microsoft Fabric.**
 

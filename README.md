@@ -1,14 +1,14 @@
-# Fabric Automation Bundles
+# <img src="docs/assets/fabric-icon.png" width="32" height="32" align="top" /> Fabric Automation Bundles
 
 [![PyPI](https://img.shields.io/pypi/v/fabric-automation-bundles?color=teal)](https://pypi.org/project/fabric-automation-bundles/)
 [![Python](https://img.shields.io/pypi/pyversions/fabric-automation-bundles)](https://pypi.org/project/fabric-automation-bundles/)
 [![License](https://img.shields.io/github/license/dereknguyenio/fabric-automation-bundles)](https://github.com/dereknguyenio/fabric-automation-bundles/blob/main/LICENSE)
 [![Tests](https://img.shields.io/github/actions/workflow/status/dereknguyenio/fabric-automation-bundles/ci.yml?label=tests)](https://github.com/dereknguyenio/fabric-automation-bundles/actions)
-[![Docs](https://img.shields.io/badge/docs-live-teal)](https://dereknguyenio.github.io/fabric-automation-bundles/)
+[![Docs](https://img.shields.io/badge/docs-dereknguyenio.github.io-teal)](https://dereknguyenio.github.io/fabric-automation-bundles/)
 
 > **Public Preview** — 30 item types verified against live Fabric API. Core workflows are production-ready. [See what's tested.](#tested-item-types)
 
-**Declarative project definitions for Microsoft Fabric.**
+**Declarative project definitions for Microsoft Fabric.** [Read the docs →](https://dereknguyenio.github.io/fabric-automation-bundles/)
 
 Define your entire Fabric project in a single `fabric.yml` — lakehouses, notebooks, pipelines, semantic models, Data Agents, security roles, and environment targets — then validate, plan, and deploy with a single command.
 

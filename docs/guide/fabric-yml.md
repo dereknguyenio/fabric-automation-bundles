@@ -2,6 +2,8 @@
 
 The `fabric.yml` file is the single declarative definition for a Microsoft Fabric project. It defines every resource, environment target, security role, connection, and policy for your project in one file (or split across multiple files using `include`).
 
+`fabric.yml` describes the **desired state** of your workspace — *what* you want, not *how* to build it. The CLI handles dependency ordering, diffing against actual state, and applying the changes. For the conceptual model behind that loop, see [The declarative model](declarative-model.md).
+
 This topic provides a complete reference for every top-level key, field, type, default value, and validation rule in the `fabric.yml` schema.
 
 ---

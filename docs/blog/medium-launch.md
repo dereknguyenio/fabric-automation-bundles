@@ -61,7 +61,15 @@ Fabric had nothing.
 
 Fabric Automation Bundles is built around one idea: **your entire Fabric project should fit in a single, version-controlled file** — and that file should be the source of truth.
 
-Here’s a real bundle. Read it like English. It is English:
+It's a **declarative** model, in the same lineage as Terraform and Databricks Asset Bundles. You describe the *desired state* of your workspace — these lakehouses, these notebooks pointed at those lakehouses, this pipeline that runs them on this schedule — and the CLI works out the rest:
+
+- The **order** to create things in, from the dependency graph (lakehouses → notebooks → pipelines → semantic models → reports → Data Agents).
+- The **diff** between what you've described and what's actually live in the workspace, so `deploy` only does the work that's needed.
+- The **drift** when somebody clicks something in the portal that doesn't match the file.
+
+That's it. Re-running the same `deploy` against an unchanged bundle is a no-op. Re-running it against a changed bundle does the minimum required to converge. Re-running it against a workspace someone hand-edited tells you exactly what they touched.
+
+Here's a real bundle. Read it like English. It is English:
 
 ```yaml
 bundle:

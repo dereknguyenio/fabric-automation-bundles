@@ -6,6 +6,8 @@
 
 Define your entire Fabric project in a single `fabric.yml` — lakehouses, notebooks, pipelines, semantic models, Data Agents, security roles, and environment targets — then validate, plan, and deploy with a single command.
 
+You describe the **desired state** of your workspace. `fab-bundle` figures out what to create, update, or delete to make it so — in the right order, idempotently, with drift detection on every run. If you've used Terraform or Databricks Asset Bundles, you already know the model. → [Read about the declarative model](guide/declarative-model.md).
+
 ```bash
 pip install fabric-automation-bundles
 fab-bundle init --template medallion --name my-project

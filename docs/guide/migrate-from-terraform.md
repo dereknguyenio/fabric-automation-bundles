@@ -15,6 +15,20 @@ If you're using the [Terraform Fabric Provider](https://registry.terraform.io/pr
 | MCP support | No | Yes (12 tools) |
 | Item types | ~15 | 45 |
 
+## Adoption flows
+
+fab-bundle ships three complementary commands for bringing existing resources under management. Pick the one that matches your starting point:
+
+| Command | Use when | Scope |
+|---|---|---|
+| [`fab-bundle import --from-terraform`](../cli/commands.md#import) | You already manage Fabric with Terraform and want to migrate in bulk. | Reads `terraform.tfstate`, extracts all `microsoft_fabric_*` resources, and seeds fab-bundle state. |
+| [`fab-bundle generate`](../cli/commands.md#generate) | You have a workspace but no declaration yet and want to reverse-engineer a `fabric.yml`. | Scans a live workspace and writes `fabric.yml` plus item content (notebook source, etc.). |
+| [`fab-bundle bind`](../cli/commands.md#bind) | You wrote the declaration by hand and want to attach it to an existing item without recreating it. | Per-resource; binds one entry in `fabric.yml` to one live item by ID. |
+
+> **Compared to Databricks Asset Bundles**
+>
+> `databricks bundle generate` exists but is per-resource-type and requires the existing item's ID. `databricks bundle deployment bind` is the direct analog of `fab-bundle bind`. DAB has **no equivalent of `fab-bundle import --from-terraform`** — migrating from Terraform on Databricks is a manual `generate` + `bind` per resource. Bulk `tfstate` ingestion is unique to fab-bundle.
+
 ## Step-by-step Migration
 
 ### 1. Import existing state
